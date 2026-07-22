@@ -258,12 +258,20 @@ function buildHandleDecorations(doc, controllerRef) {
   return DecorationSet.create(doc, decos);
 }
 
+// Shared holder so other node types (e.g. projectoLink, which renders its own
+// handle from a NodeView instead of a decoration — atoms have no textblock
+// leaf for buildHandleDecorations to anchor a widget to) can reach the same
+// controller instance. One editor per WebView, so a module-level singleton is
+// fine; read lazily at event time since the plugin view is created after
+// other extensions register.
+const controllerRef = { current: null };
+export function getDragController() {
+  return controllerRef.current;
+}
+
 export const BlockDragHandle = Extension.create({
   name: 'blockDragHandle',
   addProseMirrorPlugins() {
-    // Shared holder so the decoration's pointerdown can reach the controller
-    // created in the plugin view (read lazily at event time).
-    const controllerRef = { current: null };
     return [
       new Plugin({
         key: pluginKey,

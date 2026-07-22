@@ -6,6 +6,7 @@
 // WebView-side fetch would be subject to browser CORS, which the share page
 // does not grant, while RN's own fetch is not.
 import { Node, mergeAttributes, nodeInputRule, nodePasteRule } from '@tiptap/core';
+import { getDragController } from './blockDragHandle';
 
 const SHARE_URL_RE = /(https?:\/\/[^\s<>"']*\/api\/web\/share\/[^\s<>"']*)/g;
 const SHARE_URL_INPUT_RE = /(https?:\/\/[^\s<>"']*\/api\/web\/share\/[^\s<>"']*)\s$/;
@@ -226,11 +227,31 @@ export const ProjectoLink = Node.create({
       injectCardCSS();
 
       let currentNode = node;
+
+      // `dom` is the actual top-level ProseMirror child (`.ProseMirror > *`
+      // already makes it position:relative — see index.html), holding the
+      // drag handle plus the card. buildHandleDecorations (blockDragHandle.js)
+      // can't give atom nodes a handle — it anchors its widget inside a
+      // textblock leaf, which atoms don't have — so this node wires its own
+      // handle directly to the shared drag controller instead.
       const dom = document.createElement('div');
       dom.contentEditable = 'false';
-      paintCard(dom, currentNode.attrs);
 
-      dom.addEventListener('click', (e) => {
+      const handle = document.createElement('span');
+      handle.className = 'block-drag-handle';
+      handle.textContent = '⋮';
+      handle.contentEditable = 'false';
+      handle.addEventListener('pointerdown', (e) => {
+        const controller = getDragController();
+        if (controller) controller.startDrag(e);
+      });
+      dom.appendChild(handle);
+
+      const card = document.createElement('div');
+      dom.appendChild(card);
+      paintCard(card, currentNode.attrs);
+
+      card.addEventListener('click', (e) => {
         e.preventDefault();
         postMessage({
           type: 'projectoLinkPress',
@@ -252,7 +273,7 @@ export const ProjectoLink = Node.create({
         update(updatedNode) {
           if (updatedNode.type.name !== 'projectoLink') return false;
           currentNode = updatedNode;
-          paintCard(dom, currentNode.attrs);
+          paintCard(card, currentNode.attrs);
           return true;
         },
       };
