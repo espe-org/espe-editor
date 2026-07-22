@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <title>editor</title>
+    <!-- Base layout/reset styles, mirrored from @10play/tentap-editor's own
+         simpleWebEditor/index.html. The custom bundle must replicate these or
+         the WebView mis-sizes the editor AND ".ProseMirror:focus { outline:none }"
+         is lost, which makes a blue focus border show around the whole editor. -->
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        font-family: system-ui, -apple-system, sans-serif;
+      }
+      #root > div:nth-of-type(1) {
+        position: absolute;
+        height: 100%;
+        overflow: auto;
+        /* Never scroll horizontally. A document editor has no use for it, and
+           any sub-pixel/element overflow otherwise triggers iOS rubber-band
+           horizontal scroll (seen on a real device, not in the simulator). */
+        overflow-x: hidden;
+        width: 100%;
+        top: 0;
+        bottom: 0;
+      }
+      #root > div.dynamic-height {
+        height: unset;
+      }
+      #root div .ProseMirror {
+        min-height: 100%;
+        overflow: visible;
+      }
+      #root div.dynamic-height .ProseMirror {
+        height: unset;
+      }
+      .ProseMirror:focus {
+        outline: none;
+      }
+      .highlight-background {
+        background-color: #e6e6ff;
+      }
+      .ProseMirror {
+        padding-left: 18px;
+        padding-right: 16px;
+        /* Wrap long unbreakable strings (URLs, long numbers) instead of letting
+           them push past the right edge and cause horizontal scroll. */
+        overflow-wrap: break-word;
+        word-break: break-word;
+      }
+      .ProseMirror ul,
+      .ProseMirror ol {
+        padding-left: 20px;
+        margin: 0;
+      }
+      .ProseMirror ul[data-type='taskList'] {
+        padding-left: 0;
+        list-style: none;
+      }
+      .ProseMirror ul[data-type='taskList'] li {
+        gap: 6px;
+      }
+      .ProseMirror li {
+        margin: 0;
+      }
+      .ProseMirror p,
+      .ProseMirror h1,
+      .ProseMirror h2,
+      .ProseMirror h3,
+      .ProseMirror h4,
+      .ProseMirror h5,
+      .ProseMirror h6 {
+        margin: 0.5em 0;
+      }
+      /* Outline indent / collapse (mirrors web) */
+      .ProseMirror [data-indent='1'] {
+        padding-left: 12px;
+      }
+      .ProseMirror [data-indent='2'] {
+        padding-left: 24px;
+      }
+      .ProseMirror [data-indent='3'] {
+        padding-left: 36px;
+      }
+      .ProseMirror [data-indent='4'] {
+        padding-left: 48px;
+      }
+      .ProseMirror [data-indent='5'] {
+        padding-left: 60px;
+      }
+      .ProseMirror [data-indent='6'] {
+        padding-left: 72px;
+      }
+      .ProseMirror [data-indent='7'] {
+        padding-left: 84px;
+      }
+      .ProseMirror [data-indent='8'] {
+        padding-left: 96px;
+      }
+      .oc-hidden {
+        display: none !important;
+      }
+      .oc-chevron {
+        display: inline-block;
+        width: 18px;
+        margin-left: -18px;
+        margin-top: -2px;
+        margin-right: 0;
+        text-align: center;
+        color: #9aa0a6;
+        cursor: pointer;
+        user-select: none;
+        -webkit-user-select: none;
+        font-size: 22px;
+        line-height: 1;
+        vertical-align: middle;
+        touch-action: manipulation;
+      }
+      /* The drag handle is a widget decoration rendered INSIDE its block and
+         kept in normal flow via float (NOT position:absolute). iOS WKWebView
+         mis-hit-tests absolutely-positioned layers when the keyboard is up
+         (touch lands on a handle several rows away); in-flow elements like the
+         chevron hit-test correctly, so the handle mirrors that. */
+      /* Each top-level block is a positioning context so the handle (a span
+         inside the block's first textblock leaf) anchors to the block's right
+         edge. Inner li/td are NOT positioned, so for lists/tables the absolute
+         handle escapes the item/cell to the whole block's edge. */
+      .ProseMirror > * {
+        position: relative;
+      }
+      .block-drag-handle {
+        position: absolute;
+        top: -2px;
+        right: -10px; /* into the right gutter */
+        width: 12px;
+        height: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #9aa0a6;
+        font-size: 20px;
+        line-height: 1;
+        border-radius: 6px;
+        cursor: grab;
+        touch-action: none;
+        user-select: none;
+        -webkit-user-select: none;
+      }
+      /* Applied to the real source handle while dragging (the pressed element
+         may be a different handle on iOS, so we don't use :active). */
+      .block-drag-handle.dragging {
+        background: #eceef1;
+        color: #5f6368;
+      }
+      /* Hide the drag handles and outline chevrons while the editor is focused
+         (keyboard up / actively editing). They reappear on blur so they can be
+         used for dragging / collapsing. Besides decluttering, this keeps these
+         leading contentEditable=false widgets out of the way during editing. */
+      .ProseMirror-focused .block-drag-handle,
+      .ProseMirror-focused .oc-chevron {
+        display: none;
+      }
+      .block-drop-indicator {
+        position: absolute;
+        height: 2px;
+        background: #2962ff;
+        border-radius: 1px;
+        z-index: 41;
+        pointer-events: none;
+      }
+      /* Table styling lives here (not RN-injected at runtime) so freshly
+         inserted tables are bordered on first paint. */
+      .ProseMirror table {
+        border-collapse: collapse;
+        width: 100%;
+        margin: 10px 0;
+        table-layout: fixed;
+      }
+      .ProseMirror td,
+      .ProseMirror th {
+        border: 1px solid #ddd;
+        padding: 8px;
+        text-align: left;
+        vertical-align: top;
+        min-width: 1em;
+      }
+      .ProseMirror th {
+        background-color: #f2f2f2;
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/index.jsx"></script>
+  </body>
+</html>
