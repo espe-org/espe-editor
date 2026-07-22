@@ -43,9 +43,18 @@ function injectCardCSS() {
       border-radius: 4px;
       object-fit: contain;
       flex-shrink: 0;
+      align-self: flex-start;
       /* Transparent by default — the Projecto icon itself has a
          transparent background, so no fill here lets it blend into the
          card instead of sitting in a gray box. */
+      /* Resets against the editor's global img styling (RichEditor's
+         IMAGE_CSS), which sets margin/box-shadow/display for user-inserted
+         content images and would otherwise bleed onto this icon too —
+         that stray top margin was what pushed it out of the card's
+         top-left corner, and the shadow was its box-shadow. */
+      margin: 0;
+      box-shadow: none;
+      display: block;
     }
     .pl-card-icon--skeleton {
       background: linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%);
