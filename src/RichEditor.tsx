@@ -10,7 +10,8 @@ import {
 	useRef,
 	useState,
 } from "react";
-import { KeyboardAvoidingView, Linking, Platform, StyleSheet, View } from "react-native";
+import { Keyboard, Linking, Platform, StyleSheet, View } from "react-native";
+import type { KeyboardEventName } from "react-native";
 import { ColorBar } from "./ColorBar";
 import { HIGHLIGHT_COLORS, IMAGE_CSS, TEXT_COLORS } from "./constants";
 import { editorHtml } from "./generated/editorHtml";
@@ -43,6 +44,24 @@ export const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
 		const [colorMenu, setColorMenu] = useState<"text" | "highlight" | null>(null);
 		const [tableMenuVisible, setTableMenuVisible] = useState(false);
 		const [previewImage, setPreviewImage] = useState<string | null>(null);
+		const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+		// Tracked manually (matching the same events tentap's own useKeyboard
+		// hook uses internally for avoidIosKeyboard) rather than relying on
+		// KeyboardAvoidingView's "padding" behavior, which doesn't reliably
+		// push absolutely-unrelated content above the keyboard in this layout.
+		useEffect(() => {
+			const hideEvent: KeyboardEventName =
+				Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+			const didShow = Keyboard.addListener("keyboardDidShow", (e) => {
+				setKeyboardHeight(e.endCoordinates.height);
+			});
+			const hide = Keyboard.addListener(hideEvent, () => setKeyboardHeight(0));
+			return () => {
+				didShow.remove();
+				hide.remove();
+			};
+		}, []);
 
 		// Guards the `value` effect below against feedback loops: setContent()
 		// calls made in response to `value` must not be mistaken for user edits.
@@ -130,10 +149,7 @@ export const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
 
 		return (
 			<View style={[styles.container, style]}>
-				<KeyboardAvoidingView
-					style={styles.keyboardAvoider}
-					behavior={Platform.OS === "ios" ? "padding" : "height"}
-				>
+				<View style={[styles.keyboardAvoider, { paddingBottom: keyboardHeight }]}>
 					<View style={styles.editorWrapper}>
 						<RichText
 							editor={editor}
@@ -216,7 +232,7 @@ export const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
 							</View>
 						) : null}
 					</View>
-				</KeyboardAvoidingView>
+				</View>
 
 				{!onImagePress ? (
 					<ImagePreviewModal src={previewImage} onClose={() => setPreviewImage(null)} />
