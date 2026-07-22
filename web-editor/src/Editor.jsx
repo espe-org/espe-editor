@@ -8,6 +8,7 @@ import { TableHeader } from '@tiptap/extension-table-header';
 import { BlockDragHandle } from './blockDragHandle';
 import { OutlineIndent } from './OutlineIndent';
 import { ImageLongPress } from './imageLongPress';
+import { ProjectoLink } from './projectoLink';
 
 // Mirrors tentap's own Tiptap.tsx whitelist filtering of the default bridges.
 const tenTapExtensions = TenTapStartKit.filter(
@@ -48,6 +49,7 @@ export default function Editor() {
         BlockDragHandle,
         OutlineIndent,
         ImageLongPress,
+        ProjectoLink,
       ],
     },
   });

@@ -10,11 +10,12 @@ import {
 	useRef,
 	useState,
 } from "react";
-import { KeyboardAvoidingView, Platform, StyleSheet, View } from "react-native";
+import { KeyboardAvoidingView, Linking, Platform, StyleSheet, View } from "react-native";
 import { ColorBar } from "./ColorBar";
 import { HIGHLIGHT_COLORS, IMAGE_CSS, TEXT_COLORS } from "./constants";
 import { editorHtml } from "./generated/editorHtml";
 import { ImagePreviewModal } from "./ImagePreviewModal";
+import { buildPatchProjectoLinkScript, resolveProjectoLink } from "./projectoLinkResolver";
 import { TableMenu } from "./TableMenu";
 import { useToolbarItems } from "./Toolbar";
 import type { RichEditorProps, RichEditorRef } from "./types";
@@ -32,6 +33,7 @@ export const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
 			editable = true,
 			onRequestImage,
 			onImagePress,
+			onProjectoLinkPress,
 			textColors = TEXT_COLORS,
 			highlightColors = HIGHLIGHT_COLORS,
 			style,
@@ -133,19 +135,56 @@ export const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
 						editor={editor}
 						exclusivelyUseCustomOnMessage={false}
 						onMessage={(event) => {
-							// Posted by web-editor/src/imageLongPress.js on a
-							// long-press of an image.
 							const data = event?.nativeEvent?.data;
-							if (typeof data === "string" && data.indexOf("imagePreview") !== -1) {
-								try {
+							if (typeof data !== "string") return;
+							try {
+								// Posted by web-editor/src/imageLongPress.js on a
+								// long-press of an image.
+								if (data.indexOf("imagePreview") !== -1) {
 									const msg = JSON.parse(data);
 									if (msg.type === "imagePreview" && msg.payload?.src) {
 										if (onImagePress) onImagePress(msg.payload.src);
 										else setPreviewImage(msg.payload.src);
 									}
-								} catch (_e) {
-									// ignore non-JSON messages
+									return;
 								}
+
+								// Posted by web-editor/src/projectoLink.js when a
+								// freshly-inserted card needs its data fetched.
+								// The fetch happens here (native), not in the
+								// WebView, since the share page sends no CORS
+								// headers and RN's fetch isn't subject to them.
+								if (data.indexOf("projectoLinkResolve") !== -1) {
+									const msg = JSON.parse(data);
+									if (msg.type === "projectoLinkResolve" && msg.payload?.id && msg.payload?.url) {
+										const { id, url } = msg.payload;
+										resolveProjectoLink(url).then((result) => {
+											const patch = result
+												? {
+														status: "ready",
+														title: result.title,
+														icon: result.icon,
+														description: result.description,
+														taskUrl: result.taskUrl,
+													}
+												: { status: "error" };
+											editor.injectJS(buildPatchProjectoLinkScript(id, patch));
+										});
+									}
+									return;
+								}
+
+								// Posted by web-editor/src/projectoLink.js when a
+								// resolved card is tapped.
+								if (data.indexOf("projectoLinkPress") !== -1) {
+									const msg = JSON.parse(data);
+									if (msg.type === "projectoLinkPress" && msg.payload?.taskUrl) {
+										if (onProjectoLinkPress) onProjectoLinkPress(msg.payload.taskUrl);
+										else Linking.openURL(msg.payload.taskUrl).catch(() => {});
+									}
+								}
+							} catch (_e) {
+								// ignore non-JSON messages
 							}
 						}}
 					/>

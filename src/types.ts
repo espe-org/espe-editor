@@ -32,6 +32,13 @@ export interface RichEditorProps {
 	 * modal is used. */
 	onImagePress?: (src: string) => void;
 
+	/** Called when a resolved Projecto task-share card is tapped. Detection
+	 * and rendering of these cards (pasted/typed links containing
+	 * "/api/web/share/") is always on, built into the editor — this prop is
+	 * only an escape hatch for in-app navigation. If omitted, the task URL
+	 * opens via Linking.openURL. */
+	onProjectoLinkPress?: (taskUrl: string) => void;
+
 	/** Swatches for the text-color / highlight toolbar pickers. First entry
 	 * should be `null` to represent "reset to default". */
 	textColors?: (string | null)[];
