@@ -38,12 +38,14 @@ function injectCardCSS() {
       cursor: pointer;
     }
     .pl-card-icon {
-      width: 40px;
-      height: 40px;
-      border-radius: 8px;
-      object-fit: cover;
+      width: 20px;
+      height: 20px;
+      border-radius: 4px;
+      object-fit: contain;
       flex-shrink: 0;
-      background: #f0f0f0;
+      /* Transparent by default — the Projecto icon itself has a
+         transparent background, so no fill here lets it blend into the
+         card instead of sitting in a gray box. */
     }
     .pl-card-icon--skeleton {
       background: linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%);

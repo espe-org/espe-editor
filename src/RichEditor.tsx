@@ -44,20 +44,29 @@ export const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
 		const [colorMenu, setColorMenu] = useState<"text" | "highlight" | null>(null);
 		const [tableMenuVisible, setTableMenuVisible] = useState(false);
 		const [previewImage, setPreviewImage] = useState<string | null>(null);
-		const [keyboardHeight, setKeyboardHeight] = useState(0);
+		const [toolbarBottomOffset, setToolbarBottomOffset] = useState(0);
+		const containerRef = useRef<View>(null);
 
-		// Drives the toolbar's `bottom` offset directly from the measured
-		// keyboard height. KeyboardAvoidingView's own "padding" heuristic
-		// under-shoots in this exact absolutely-positioned nesting (confirmed
-		// empirically: it left ~60pt of the toolbar still under the keyboard),
-		// so this bypasses it entirely rather than trying to tune an offset.
+		// Drives the toolbar's `bottom` offset from the actual measured overlap
+		// between this container's bottom edge and the keyboard's top edge (both
+		// in absolute window coordinates via measureInWindow), rather than the
+		// keyboard's raw height. Using raw height assumes this container's own
+		// "bottom: 0" coincides with the true screen bottom, which isn't true
+		// when a consuming app wraps RichEditor in a SafeAreaView/inset — that
+		// mismatch is exactly what left a stray gap above the toolbar. Measuring
+		// both edges directly is correct regardless of any such nesting, with no
+		// extra setup required from the consuming app.
 		useEffect(() => {
 			const hideEvent: KeyboardEventName =
 				Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
 			const didShow = Keyboard.addListener("keyboardDidShow", (e) => {
-				setKeyboardHeight(e.endCoordinates.height);
+				containerRef.current?.measureInWindow((_x, y, _width, height) => {
+					const containerBottomY = y + height;
+					const keyboardTopY = e.endCoordinates.screenY;
+					setToolbarBottomOffset(Math.max(containerBottomY - keyboardTopY, 0));
+				});
 			});
-			const hide = Keyboard.addListener(hideEvent, () => setKeyboardHeight(0));
+			const hide = Keyboard.addListener(hideEvent, () => setToolbarBottomOffset(0));
 			return () => {
 				didShow.remove();
 				hide.remove();
@@ -149,7 +158,7 @@ export const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
 		if (!editor) return null;
 
 		return (
-			<View style={[styles.container, style]}>
+			<View ref={containerRef} style={[styles.container, style]}>
 				<View style={styles.editorWrapper}>
 					<RichText
 							editor={editor}
@@ -210,7 +219,7 @@ export const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
 						/>
 					</View>
 
-				<View style={[styles.toolbarContainer, { bottom: keyboardHeight }]}>
+				<View style={[styles.toolbarContainer, { bottom: toolbarBottomOffset }]}>
 					<View style={styles.toolbarStack}>
 						<TenTapToolbar editor={editor} items={toolbarItems} />
 						{colorMenu ? (
