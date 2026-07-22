@@ -130,74 +130,70 @@ export const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
 
 		return (
 			<View style={[styles.container, style]}>
-				<View style={styles.editorWrapper}>
-					<RichText
-						editor={editor}
-						exclusivelyUseCustomOnMessage={false}
-						onMessage={(event) => {
-							const data = event?.nativeEvent?.data;
-							if (typeof data !== "string") return;
-							try {
-								// Posted by web-editor/src/imageLongPress.js on a
-								// long-press of an image.
-								if (data.indexOf("imagePreview") !== -1) {
-									const msg = JSON.parse(data);
-									if (msg.type === "imagePreview" && msg.payload?.src) {
-										if (onImagePress) onImagePress(msg.payload.src);
-										else setPreviewImage(msg.payload.src);
-									}
-									return;
-								}
-
-								// Posted by web-editor/src/projectoLink.js when a
-								// freshly-inserted card needs its data fetched.
-								// The fetch happens here (native), not in the
-								// WebView, since the share page sends no CORS
-								// headers and RN's fetch isn't subject to them.
-								if (data.indexOf("projectoLinkResolve") !== -1) {
-									const msg = JSON.parse(data);
-									if (msg.type === "projectoLinkResolve" && msg.payload?.id && msg.payload?.url) {
-										const { id, url } = msg.payload;
-										resolveProjectoLink(url).then((result) => {
-											const patch = result
-												? {
-														status: "ready",
-														title: result.title,
-														icon: result.icon,
-														description: result.description,
-														taskUrl: result.taskUrl,
-													}
-												: { status: "error" };
-											editor.injectJS(buildPatchProjectoLinkScript(id, patch));
-										});
-									}
-									return;
-								}
-
-								// Posted by web-editor/src/projectoLink.js when a
-								// resolved card is tapped.
-								if (data.indexOf("projectoLinkPress") !== -1) {
-									const msg = JSON.parse(data);
-									if (msg.type === "projectoLinkPress" && msg.payload?.taskUrl) {
-										if (onProjectoLinkPress) onProjectoLinkPress(msg.payload.taskUrl);
-										else Linking.openURL(msg.payload.taskUrl).catch(() => {});
-									}
-								}
-							} catch (_e) {
-								// ignore non-JSON messages
-							}
-						}}
-					/>
-				</View>
-
-				{!onImagePress ? (
-					<ImagePreviewModal src={previewImage} onClose={() => setPreviewImage(null)} />
-				) : null}
-
 				<KeyboardAvoidingView
+					style={styles.keyboardAvoider}
 					behavior={Platform.OS === "ios" ? "padding" : "height"}
-					style={styles.toolbarContainer}
 				>
+					<View style={styles.editorWrapper}>
+						<RichText
+							editor={editor}
+							exclusivelyUseCustomOnMessage={false}
+							onMessage={(event) => {
+								const data = event?.nativeEvent?.data;
+								if (typeof data !== "string") return;
+								try {
+									// Posted by web-editor/src/imageLongPress.js on a
+									// long-press of an image.
+									if (data.indexOf("imagePreview") !== -1) {
+										const msg = JSON.parse(data);
+										if (msg.type === "imagePreview" && msg.payload?.src) {
+											if (onImagePress) onImagePress(msg.payload.src);
+											else setPreviewImage(msg.payload.src);
+										}
+										return;
+									}
+
+									// Posted by web-editor/src/projectoLink.js when a
+									// freshly-inserted card needs its data fetched.
+									// The fetch happens here (native), not in the
+									// WebView, since the share page sends no CORS
+									// headers and RN's fetch isn't subject to them.
+									if (data.indexOf("projectoLinkResolve") !== -1) {
+										const msg = JSON.parse(data);
+										if (msg.type === "projectoLinkResolve" && msg.payload?.id && msg.payload?.url) {
+											const { id, url } = msg.payload;
+											resolveProjectoLink(url).then((result) => {
+												const patch = result
+													? {
+															status: "ready",
+															title: result.title,
+															icon: result.icon,
+															description: result.description,
+															taskUrl: result.taskUrl,
+														}
+													: { status: "error" };
+												editor.injectJS(buildPatchProjectoLinkScript(id, patch));
+											});
+										}
+										return;
+									}
+
+									// Posted by web-editor/src/projectoLink.js when a
+									// resolved card is tapped.
+									if (data.indexOf("projectoLinkPress") !== -1) {
+										const msg = JSON.parse(data);
+										if (msg.type === "projectoLinkPress" && msg.payload?.taskUrl) {
+											if (onProjectoLinkPress) onProjectoLinkPress(msg.payload.taskUrl);
+											else Linking.openURL(msg.payload.taskUrl).catch(() => {});
+										}
+									}
+								} catch (_e) {
+									// ignore non-JSON messages
+								}
+							}}
+						/>
+					</View>
+
 					<View style={styles.toolbarStack}>
 						<TenTapToolbar editor={editor} items={toolbarItems} />
 						{colorMenu ? (
@@ -222,6 +218,10 @@ export const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
 					</View>
 				</KeyboardAvoidingView>
 
+				{!onImagePress ? (
+					<ImagePreviewModal src={previewImage} onClose={() => setPreviewImage(null)} />
+				) : null}
+
 				<TableMenu
 					visible={tableMenuVisible}
 					onClose={() => setTableMenuVisible(false)}
@@ -241,6 +241,9 @@ const styles = StyleSheet.create({
 		flex: 1,
 		backgroundColor: "#fff",
 	},
+	keyboardAvoider: {
+		flex: 1,
+	},
 	editorWrapper: {
 		flex: 1,
 		backgroundColor: "#fff",
@@ -250,11 +253,6 @@ const styles = StyleSheet.create({
 		// padding), not here.
 		paddingLeft: 2,
 		paddingRight: 0,
-	},
-	toolbarContainer: {
-		position: "absolute",
-		width: "100%",
-		bottom: 0,
 	},
 	toolbarStack: {
 		position: "relative",
