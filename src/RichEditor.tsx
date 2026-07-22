@@ -46,10 +46,11 @@ export const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
 		const [previewImage, setPreviewImage] = useState<string | null>(null);
 		const [keyboardHeight, setKeyboardHeight] = useState(0);
 
-		// Tracked manually (matching the same events tentap's own useKeyboard
-		// hook uses internally for avoidIosKeyboard) rather than relying on
-		// KeyboardAvoidingView's "padding" behavior, which doesn't reliably
-		// push absolutely-unrelated content above the keyboard in this layout.
+		// Drives the toolbar's `bottom` offset directly from the measured
+		// keyboard height. KeyboardAvoidingView's own "padding" heuristic
+		// under-shoots in this exact absolutely-positioned nesting (confirmed
+		// empirically: it left ~60pt of the toolbar still under the keyboard),
+		// so this bypasses it entirely rather than trying to tune an offset.
 		useEffect(() => {
 			const hideEvent: KeyboardEventName =
 				Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
@@ -149,9 +150,8 @@ export const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
 
 		return (
 			<View style={[styles.container, style]}>
-				<View style={[styles.keyboardAvoider, { paddingBottom: keyboardHeight }]}>
-					<View style={styles.editorWrapper}>
-						<RichText
+				<View style={styles.editorWrapper}>
+					<RichText
 							editor={editor}
 							exclusivelyUseCustomOnMessage={false}
 							onMessage={(event) => {
@@ -210,6 +210,7 @@ export const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
 						/>
 					</View>
 
+				<View style={[styles.toolbarContainer, { bottom: keyboardHeight }]}>
 					<View style={styles.toolbarStack}>
 						<TenTapToolbar editor={editor} items={toolbarItems} />
 						{colorMenu ? (
@@ -257,9 +258,6 @@ const styles = StyleSheet.create({
 		flex: 1,
 		backgroundColor: "#fff",
 	},
-	keyboardAvoider: {
-		flex: 1,
-	},
 	editorWrapper: {
 		flex: 1,
 		backgroundColor: "#fff",
@@ -269,6 +267,15 @@ const styles = StyleSheet.create({
 		// padding), not here.
 		paddingLeft: 2,
 		paddingRight: 0,
+	},
+	// Matches tentap's own theme.toolbar.keyboardAvoidingView: the toolbar's
+	// FlatList has both flex:1 and an explicit height (see toolbarTheme.ts),
+	// which only resolves to its intended fixed height when absolutely
+	// positioned — nesting it in normal flex flow collapses it to ~0.
+	toolbarContainer: {
+		position: "absolute",
+		width: "100%",
+		// `bottom` is set inline from tracked keyboard height.
 	},
 	toolbarStack: {
 		position: "relative",
