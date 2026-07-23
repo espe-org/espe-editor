@@ -47,6 +47,78 @@ function Screen() {
 }
 ```
 
+### Full example (every prop)
+
+```tsx
+import { useRef, useState } from "react";
+import { View } from "react-native";
+import RichEditor, { RichEditorRef } from "espe-editor";
+
+function Screen() {
+  const editorRef = useRef<RichEditorRef>(null);
+  const [html, setHtml] = useState<string | undefined>(undefined);
+  const [contentHeight, setContentHeight] = useState(0);
+
+  return (
+    <View style={{ maxHeight: 400 }}>
+      <RichEditor
+        ref={editorRef}
+        // --- Content ---
+        initialContent="<h2>Hello!</h2><p>Start typing…</p>"
+        // Omit `value` entirely for fully uncontrolled mode. Only pass it for
+        // lightly-controlled sync (e.g. restoring content from elsewhere) —
+        // echoing back the same string you just got from onChangeHTML is a
+        // no-op, so it won't fight the user's cursor while they type.
+        value={html}
+        onChangeHTML={setHtml} // debounced 300ms
+        placeholder="Введите текст..."
+        autofocus={true} // default
+        editable={true} // default
+
+        // --- Images ---
+        // Toolbar's image button only renders when onRequestImage is supplied.
+        onRequestImage={async () => {
+          // Show your own picker/camera UI, return a data-URI or URL (or null to cancel).
+          return null;
+        }}
+        onImagePress={(src) => console.log("image tapped:", src)} // optional; overrides the built-in preview modal
+
+        // --- Projecto link cards ---
+        // Detection/rendering of pasted "/api/web/share/" links is always on;
+        // this is just an escape hatch for in-app navigation on tap.
+        onProjectoLinkPress={(taskUrl) => console.log("projecto card tapped:", taskUrl)}
+
+        // --- Generic link taps (any other <a> in the content) ---
+        onLinkPress={(href) => console.log("link tapped:", href)}
+
+        // --- Color pickers ---
+        textColors={[null, "#e03131", "#2f9e44", "#1971c2"]} // first entry = "reset to default"
+        highlightColors={[null, "#ffec99", "#b2f2bb", "#a5d8ff"]}
+
+        // --- Embeddable / auto-size layout ---
+        // Pair dynamicHeight with toolbarPosition "top"/"bottom", not "floating".
+        dynamicHeight
+        onContentHeightChange={setContentHeight}
+
+        // --- Toolbar composition & placement ---
+        toolbarPosition="bottom" // "floating" (default) | "top" | "bottom"
+        toolbarActions={["bold", "italic", "underline", "link", "table", "image"]} // omit for the full default set
+
+        // --- Focus tracking ---
+        onFocus={() => console.log("focused")}
+        onBlur={() => console.log("blurred")}
+
+        // --- Theming ---
+        colorScheme="dark" // "light" (default) | "dark" — pair with your app's own dark-mode state
+
+        // --- Layout ---
+        style={{ backgroundColor: "transparent" }}
+      />
+    </View>
+  );
+}
+```
+
 ### Scope
 
 This library owns the core editing surface only: the toolbar, tables, text
@@ -69,6 +141,17 @@ the imperative ref (`getHTML()` / `setContent()`).
 | `editable`         | `boolean`                                         | Defaults to `true`. |
 | `onRequestImage`   | `() => Promise<string \| null \| undefined>`      | Called when the toolbar's image button is pressed. The image button is hidden entirely if this prop is omitted. |
 | `onImagePress`     | `(src: string) => void`                           | Overrides the built-in full-screen image-preview modal (triggered by long-pressing an image). |
+| `onProjectoLinkPress` | `(taskUrl: string) => void`                   | Tap handler for resolved Projecto task-share cards (detection is always on). Defaults to `Linking.openURL`. |
+| `onLinkPress`      | `(href: string) => void`                          | Tap handler for any other hyperlink in the content. Defaults to `Linking.openURL`. |
+| `textColors`       | `(string \| null)[]`                              | Swatches for the text-color toolbar picker. First entry `null` = "reset to default". |
+| `highlightColors`  | `(string \| null)[]`                              | Swatches for the highlight toolbar picker. Same `null`-first convention. |
+| `dynamicHeight`    | `boolean`                                         | Size the WebView to its own content instead of `flex: 1`, for embedding inline in a scrollable screen. Pair with `toolbarPosition: "top"/"bottom"`, not `"floating"`. |
+| `onContentHeightChange` | `(height: number) => void`                   | Fires on document height changes. Only meaningful with `dynamicHeight`. |
+| `toolbarPosition`  | `"floating" \| "top" \| "bottom"`                 | Defaults to `"floating"` (absolute, keyboard-tracked, auto-hides while unfocused). `"top"`/`"bottom"` dock it in normal flow, always visible. |
+| `toolbarActions`   | `ToolbarAction[]`                                 | Restricts the toolbar to these actions. Omit for the full default set. `"image"` still additionally requires `onRequestImage`. |
+| `onFocus`          | `() => void`                                      | |
+| `onBlur`           | `() => void`                                      | |
+| `colorScheme`      | `"light" \| "dark"`                               | Defaults to `"light"`. Switches the editor's own built-in theme/CSS; pair with your app's dark-mode state. |
 | `style`            | `StyleProp<ViewStyle>`                            | Wraps the editor + toolbar container. |
 
 ### `RichEditorRef`
