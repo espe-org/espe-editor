@@ -29,8 +29,13 @@
         top: 0;
         bottom: 0;
       }
+      /* top:0/bottom:0 above always stretch a position:absolute box to fill
+         its container, regardless of `height` — so dynamic-height mode has
+         to leave absolute positioning entirely (not just unset height) to
+         let the box size to its own content instead. */
       #root > div.dynamic-height {
-        height: unset;
+        position: static;
+        height: auto;
       }
       #root div .ProseMirror {
         min-height: 100%;

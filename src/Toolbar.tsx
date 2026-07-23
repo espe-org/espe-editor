@@ -5,7 +5,7 @@ import {
 	type ToolbarItem,
 } from "@10play/tentap-editor";
 import { HIGHLIGHT_ICON, IMAGE_ICON, KEYBOARD_ICON, TABLE_ICON } from "./icons";
-import { INSERT_TABLE_EXPR } from "./constants";
+import type { ToolbarAction } from "./types";
 
 interface UseToolbarItemsArgs {
 	editor: EditorBridge;
@@ -15,12 +15,42 @@ interface UseToolbarItemsArgs {
 	onTextColorPress: () => void;
 	onHighlightPress: () => void;
 	onOpenTableMenu: () => void;
+	onOpenTableSizeModal: () => void;
+	/** Restrict to these actions. Omit for the full default set. */
+	actions?: ToolbarAction[];
 }
 
 const isHidden = (it: ToolbarItem) =>
 	it.image({} as any) === Images.code || it.image({} as any) === Images.quote;
 const isUndoRedo = (it: ToolbarItem) =>
 	it.image({} as any) === Images.undo || it.image({} as any) === Images.redo;
+
+// Maps a ToolbarAction name to the tentap default item it corresponds to, for
+// filtering DEFAULT_TOOLBAR_ITEMS by name — those items carry no name/id
+// field of their own, only {onPress, active, disabled, image}.
+const ACTION_IMAGE_MAP: Partial<Record<ToolbarAction, unknown>> = {
+	bold: Images.bold,
+	italic: Images.italic,
+	underline: Images.underline,
+	strike: Images.strikethrough,
+	link: Images.link,
+	checklist: Images.checkList,
+	heading: Images.Aa,
+	bulletList: Images.bulletList,
+	orderedList: Images.orderedList,
+	indent: Images.indent,
+	outdent: Images.outdent,
+	undo: Images.undo,
+	redo: Images.redo,
+};
+
+function actionNameOf(item: ToolbarItem): ToolbarAction | undefined {
+	const src = item.image({} as any);
+	for (const name of Object.keys(ACTION_IMAGE_MAP) as ToolbarAction[]) {
+		if (ACTION_IMAGE_MAP[name] === src) return name;
+	}
+	return undefined;
+}
 
 // Builds the native tentap toolbar items, customized:
 //  - a keyboard-dismiss button is prepended (the native toolbar is only shown
@@ -43,7 +73,11 @@ export function useToolbarItems({
 	onTextColorPress,
 	onHighlightPress,
 	onOpenTableMenu,
+	onOpenTableSizeModal,
+	actions,
 }: UseToolbarItemsArgs): ToolbarItem[] {
+	const allowed = (action: ToolbarAction) => !actions || actions.includes(action);
+
 	const keyboardItem: ToolbarItem = {
 		onPress: () => () => editor.blur(),
 		active: () => false,
@@ -52,7 +86,8 @@ export function useToolbarItems({
 	};
 
 	// The live `isInTable` comes from the WebView bundle's tableState bridge
-	// via editorState (see web-editor/src/Editor.jsx).
+	// via editorState (see web-editor/src/Editor.jsx). Outside a table this
+	// opens the size-picker modal; inside one it opens the structural-ops menu.
 	const tableItem: ToolbarItem = {
 		onPress:
 			({ editorState }) =>
@@ -60,7 +95,7 @@ export function useToolbarItems({
 				if ((editorState as any)?.isInTable) {
 					onOpenTableMenu();
 				} else {
-					runCommand(INSERT_TABLE_EXPR);
+					onOpenTableSizeModal();
 				}
 			},
 		active: () => false,
@@ -89,38 +124,45 @@ export function useToolbarItems({
 		image: () => IMAGE_ICON,
 	};
 
-	// Standard buttons from tentap, minus code & blockquote (hidden), with the
-	// indent/outdent buttons reassigned to block indent. image() on default
-	// items ignores its args, so matching by Images.* is safe.
-	const standardItems = DEFAULT_TOOLBAR_ITEMS.filter((it) => !isHidden(it)).map((item) => {
-		const src = item.image({} as any);
-		if (src === Images.indent) {
-			return {
-				...item,
-				onPress: () => () => runCommand("indentBlock()"),
-				active: () => false,
-				disabled: () => false,
-			};
-		}
-		if (src === Images.outdent) {
-			return {
-				...item,
-				onPress: () => () => runCommand("outdentBlock()"),
-				active: () => false,
-				disabled: () => false,
-			};
-		}
-		return item;
-	});
+	// Standard buttons from tentap, minus code & blockquote (always hidden —
+	// never exposed via `actions` either), with the indent/outdent buttons
+	// reassigned to block indent, then filtered down to `actions` (if given).
+	// image() on default items ignores its args, so matching by Images.* is
+	// safe.
+	const standardItems = DEFAULT_TOOLBAR_ITEMS.filter((it) => !isHidden(it))
+		.map((item) => {
+			const src = item.image({} as any);
+			if (src === Images.indent) {
+				return {
+					...item,
+					onPress: () => () => runCommand("indentBlock()"),
+					active: () => false,
+					disabled: () => false,
+				};
+			}
+			if (src === Images.outdent) {
+				return {
+					...item,
+					onPress: () => () => runCommand("outdentBlock()"),
+					active: () => false,
+					disabled: () => false,
+				};
+			}
+			return item;
+		})
+		.filter((item) => {
+			const name = actionNameOf(item);
+			return name ? allowed(name) : true;
+		});
 
 	// Order: keyboard · standard (minus undo/redo) · color · highlight · [image] · table · undo · redo.
 	return [
 		keyboardItem,
 		...standardItems.filter((it) => !isUndoRedo(it)),
-		textColorItem,
-		highlightItem,
-		...(hasImagePicker ? [imageItem] : []),
-		tableItem,
+		...(allowed("textColor") ? [textColorItem] : []),
+		...(allowed("highlight") ? [highlightItem] : []),
+		...(hasImagePicker && allowed("image") ? [imageItem] : []),
+		...(allowed("table") ? [tableItem] : []),
 		...standardItems.filter(isUndoRedo),
 	];
 }

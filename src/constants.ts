@@ -1,5 +1,3 @@
-export const INSERT_TABLE_EXPR = "insertTable({ rows: 3, cols: 3, withHeaderRow: true })";
-
 export const TEXT_COLORS: (string | null)[] = [
 	null,
 	"#202124",

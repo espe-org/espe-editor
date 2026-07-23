@@ -44,8 +44,68 @@ export interface RichEditorProps {
 	textColors?: (string | null)[];
 	highlightColors?: (string | null)[];
 
+	/** Size the WebView to its own content instead of filling the parent
+	 * (`flex: 1`) — for embedding RichEditor inline within a scrollable
+	 * screen alongside other fields, rather than as the whole screen. Pair
+	 * this with `toolbarPosition: "top"` or `"bottom"`, not `"floating"` —
+	 * a keyboard-tracked floating toolbar has no coherent meaning inside a
+	 * content-sized box. */
+	dynamicHeight?: boolean;
+
+	/** Fires whenever the WebView's document height changes. Only meaningful
+	 * together with `dynamicHeight` — use it to resize/scroll an enclosing
+	 * container, the way you'd size a wrapping View from this value. */
+	onContentHeightChange?: (height: number) => void;
+
+	/** Where the toolbar renders. `"floating"` (default) is today's
+	 * behavior: absolutely positioned, tracks the keyboard, auto-hides while
+	 * unfocused. `"top"`/`"bottom"` dock it in normal flow, always visible —
+	 * for a statically-docked toolbar instead of one that floats above the
+	 * keyboard. */
+	toolbarPosition?: "floating" | "top" | "bottom";
+
+	/** Restricts the toolbar to only these actions, in this order isn't
+	 * guaranteed (built-ins render in their standard order). Omit to show
+	 * the full default set (today's behavior). `"image"` still additionally
+	 * requires `onRequestImage` to be supplied. */
+	toolbarActions?: ToolbarAction[];
+
+	/** Fired when the editor gains/loses focus — e.g. to track which of
+	 * several editor instances on a screen is currently active. */
+	onFocus?: () => void;
+	onBlur?: () => void;
+
+	/** Called when the user taps any hyperlink in the content (not the
+	 * Projecto-card embeds — see onProjectoLinkPress for those). If omitted,
+	 * the link opens via Linking.openURL. */
+	onLinkPress?: (href: string) => void;
+
+	/** Switches the editor's own built-in dark theme/CSS on or off. Defaults
+	 * to "light". This does not affect anything outside the WebView — pair
+	 * it with your app's own dark-mode state. */
+	colorScheme?: "light" | "dark";
+
 	style?: StyleProp<ViewStyle>;
 }
+
+export type ToolbarAction =
+	| "bold"
+	| "italic"
+	| "underline"
+	| "strike"
+	| "link"
+	| "checklist"
+	| "heading"
+	| "bulletList"
+	| "orderedList"
+	| "indent"
+	| "outdent"
+	| "undo"
+	| "redo"
+	| "textColor"
+	| "highlight"
+	| "image"
+	| "table";
 
 export interface RichEditorRef {
 	getHTML: () => Promise<string>;
