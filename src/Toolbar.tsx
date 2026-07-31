@@ -18,6 +18,7 @@ interface UseToolbarItemsArgs {
 	onOpenTableSizeModal: () => void;
 	/** Restrict to these actions. Omit for the full default set. */
 	actions?: ToolbarAction[];
+	hideKeyboardCloseButton?: boolean;
 }
 
 const isHidden = (it: ToolbarItem) =>
@@ -75,6 +76,7 @@ export function useToolbarItems({
 	onOpenTableMenu,
 	onOpenTableSizeModal,
 	actions,
+	hideKeyboardCloseButton = false,
 }: UseToolbarItemsArgs): ToolbarItem[] {
 	const allowed = (action: ToolbarAction) => !actions || actions.includes(action);
 
@@ -157,7 +159,7 @@ export function useToolbarItems({
 
 	// Order: keyboard · standard (minus undo/redo) · color · highlight · [image] · table · undo · redo.
 	return [
-		keyboardItem,
+		...(hideKeyboardCloseButton ? [] : [keyboardItem]),
 		...standardItems.filter((it) => !isUndoRedo(it)),
 		...(allowed("textColor") ? [textColorItem] : []),
 		...(allowed("highlight") ? [highlightItem] : []),

@@ -49,6 +49,7 @@ export const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
 			onLinkPress,
 			colorScheme = "light",
 			style,
+			hideKeyboardCloseButton = false,
 		},
 		ref,
 	) => {
@@ -159,6 +160,7 @@ export const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
 			onOpenTableMenu: () => setTableMenuVisible(true),
 			onOpenTableSizeModal: () => setTableSizeModalVisible(true),
 			actions: toolbarActions,
+			hideKeyboardCloseButton,
 		});
 
 		useImperativeHandle(
