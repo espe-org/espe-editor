@@ -210,8 +210,8 @@ export const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
 		if (!editor) return null;
 
 		const renderToolbar = (docked: boolean) => (
-			<View style={[styles.toolbarStack, docked ? styles.toolbarStackDocked : null]}>
-				<TenTapToolbar editor={editor} items={toolbarItems} hidden={docked ? false : undefined} />
+			<View style={[styles.toolbarStack, docked && toolbarActions?.length ? styles.toolbarStackDocked : null]}>
+				{toolbarActions?.length ? <TenTapToolbar editor={editor} items={toolbarItems} hidden={docked ? false : undefined} /> : null}
 				{colorMenu ? (
 					<View style={styles.colorBarOverlay}>
 						<ColorBar
