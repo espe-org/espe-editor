@@ -9,6 +9,7 @@ import {
 	forwardRef,
 	useEffect,
 	useImperativeHandle,
+	useMemo,
 	useRef,
 	useState,
 } from "react";
@@ -17,6 +18,7 @@ import type { KeyboardEventName } from "react-native";
 import { ColorBar } from "./ColorBar";
 import { HIGHLIGHT_COLORS, IMAGE_CSS, TEXT_COLORS } from "./constants";
 import { editorHtml } from "./generated/editorHtml";
+import { STRINGS, resolveLocale } from "./i18n";
 import { ImagePreviewModal } from "./ImagePreviewModal";
 import { askImageSource } from "./imageSourceSheet";
 import { buildPatchProjectoLinkScript, resolveProjectoLink } from "./projectoLinkResolver";
@@ -50,11 +52,14 @@ export const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
 			onBlur,
 			onLinkPress,
 			colorScheme = "light",
+			locale = "ru",
 			style,
 			hideKeyboardCloseButton = false,
 		},
 		ref,
 	) => {
+		const strings = useMemo(() => STRINGS[resolveLocale(locale)], [locale]);
+
 		const [colorMenu, setColorMenu] = useState<"text" | "highlight" | null>(null);
 		const [tableMenuVisible, setTableMenuVisible] = useState(false);
 		const [tableSizeModalVisible, setTableSizeModalVisible] = useState(false);
@@ -166,7 +171,7 @@ export const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
 			if (!onRequestImage) return handleRequestCamera();
 			if (!onRequestCamera) return handleRequestImage();
 
-			const source = await askImageSource(colorScheme);
+			const source = await askImageSource(strings, colorScheme);
 			if (source === "gallery") await handleRequestImage();
 			else if (source === "camera") await handleRequestCamera();
 		};
@@ -201,6 +206,20 @@ export const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
 			editor.injectCSS(IMAGE_CSS, "image-styles");
 			// eslint-disable-next-line react-hooks/exhaustive-deps
 		}, [editor]);
+
+		// The Projecto card's loading placeholder is the one localized string
+		// rendered inside the WebView rather than by React Native, so the
+		// resolved dictionary is pushed in as a global that
+		// web-editor/src/projectoLink.js reads when it builds a card. Cards are
+		// only ever built in response to user input, long after this runs.
+		useEffect(() => {
+			editor.injectJS(
+				`window.__espeStrings = ${JSON.stringify({
+					projectoLinkLoading: strings.projectoLinkLoading,
+				})}; true;`,
+			);
+			// eslint-disable-next-line react-hooks/exhaustive-deps
+		}, [editor, strings]);
 
 		useEffect(() => {
 			if (placeholder !== undefined) editor.setPlaceholder(placeholder);
@@ -378,10 +397,12 @@ export const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
 					visible={tableMenuVisible}
 					onClose={() => setTableMenuVisible(false)}
 					onRunCommand={runCommand}
+					strings={strings}
 				/>
 
 				<TableSizeModal
 					visible={tableSizeModalVisible}
+					strings={strings}
 					onClose={() => setTableSizeModalVisible(false)}
 					onConfirm={(rows, columns) => {
 						setTableSizeModalVisible(false);

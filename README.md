@@ -122,6 +122,9 @@ function Screen() {
         // --- Theming ---
         colorScheme="dark" // "light" (default) | "dark" — pair with your app's own dark-mode state
 
+        // --- Language ---
+        locale="auto" // "ru" (default) | "en" | "auto" — covers the library's own menus only
+
         // --- Layout ---
         style={{ backgroundColor: "transparent" }}
       />
@@ -139,6 +142,30 @@ deliberately left to the consuming app — wire them up via `onRequestImage` /
 `onRequestCamera` and the imperative ref (`getHTML()` / `setContent()`). The
 only picking UI the library owns is the system sheet asking *which* of those
 two sources to use.
+
+### Localization
+
+The library renders a small amount of its own chrome — the table menus, the
+image-source sheet, and the loading placeholder on a Projecto card. Those
+strings ship in two built-in dictionaries (`ru`, `en`) selected by `locale`:
+
+```tsx
+<RichEditor locale="en" />    // "ru" (default) | "en" | "auto"
+```
+
+`"auto"` reads the device language via `Intl` and treats anything non-Russian
+as English; if `Intl` is unavailable it falls back to `"ru"`. The default stays
+`"ru"`, so existing apps see no change until they opt in.
+
+Everything else stays yours: content, `placeholder`, and any UI your app draws
+around the editor — including the image picker and camera screens behind
+`onRequestImage` / `onRequestCamera`. Toolbar buttons are icon-only and need no
+translation.
+
+To add a language, extend `STRINGS` in [`src/i18n.ts`](src/i18n.ts) — one entry
+per `Locale`, all keys required, so TypeScript flags anything left untranslated.
+`projectoLinkLoading` is the only string rendered inside the WebView; it's
+pushed in via `injectJS` and needs no bundle rebuild to change.
 
 ## API
 
@@ -166,6 +193,7 @@ two sources to use.
 | `onFocus`          | `() => void`                                      | |
 | `onBlur`           | `() => void`                                      | |
 | `colorScheme`      | `"light" \| "dark"`                               | Defaults to `"light"`. Switches the editor's own built-in theme/CSS; pair with your app's dark-mode state. |
+| `locale`           | `"ru" \| "en" \| "auto"`                          | Language of the library's own menus. Defaults to `"ru"` (today's behavior). See [Localization](#localization). |
 | `style`            | `StyleProp<ViewStyle>`                            | Wraps the editor + toolbar container. |
 
 ### `RichEditorRef`

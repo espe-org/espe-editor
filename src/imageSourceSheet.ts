@@ -1,5 +1,5 @@
 import { ActionSheetIOS, Alert, Platform } from "react-native";
-import { IMAGE_SOURCE_LABELS } from "./constants";
+import type { Strings } from "./i18n";
 
 export type ImageSource = "gallery" | "camera";
 
@@ -8,9 +8,15 @@ export type ImageSource = "gallery" | "camera";
 // has no system action sheet — the system alert dialog with the same three
 // choices. Resolves to null when the user cancels or dismisses it.
 export function askImageSource(
+	strings: Strings,
 	colorScheme: "light" | "dark" = "light",
 ): Promise<ImageSource | null> {
-	const { title, gallery, camera, cancel } = IMAGE_SOURCE_LABELS;
+	const {
+		imageSourceTitle: title,
+		imageSourceGallery: gallery,
+		imageSourceCamera: camera,
+		cancel,
+	} = strings;
 
 	if (Platform.OS === "ios") {
 		return new Promise((resolve) => {

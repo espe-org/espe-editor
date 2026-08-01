@@ -19,33 +19,8 @@ export const HIGHLIGHT_COLORS: (string | null)[] = [
 	"#d9dce0",
 ];
 
-export interface StructuralItem {
-	label: string;
-	expr: string;
-}
-
-export const STRUCTURAL_ITEMS: StructuralItem[] = [
-	{ label: "Добавить колонку слева", expr: "addColumnBefore()" },
-	{ label: "Добавить колонку справа", expr: "addColumnAfter()" },
-	{ label: "Добавить строку выше", expr: "addRowBefore()" },
-	{ label: "Добавить строку ниже", expr: "addRowAfter()" },
-	{ label: "Удалить колонку", expr: "deleteColumn()" },
-	{ label: "Удалить строку", expr: "deleteRow()" },
-	{ label: "Удалить таблицу", expr: "deleteTable()" },
-	{ label: "Верхний колонтитул строки", expr: "toggleHeaderRow()" },
-	{ label: "Верхний колонтитул колонки", expr: "toggleHeaderColumn()" },
-	{ label: "Объединить ячейки", expr: "mergeCells()" },
-	{ label: "Разделить ячейку", expr: "splitCell()" },
-];
-
-// Labels for the image-source sheet shown by the toolbar's image button when
-// the host app supplies both onRequestImage and onRequestCamera.
-export const IMAGE_SOURCE_LABELS = {
-	title: "Добавить фото",
-	gallery: "Выбрать из галереи",
-	camera: "Снять фото",
-	cancel: "Отмена",
-};
+// All user-facing strings live in ./i18n (see STRINGS / TABLE_OPS) so they can
+// be switched by the `locale` prop.
 
 // Injected into the WebView so inserted images render at a sane size.
 export const IMAGE_CSS = `

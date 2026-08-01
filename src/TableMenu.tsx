@@ -6,32 +6,33 @@ import {
 	TouchableOpacity,
 	View,
 } from "react-native";
-import { STRUCTURAL_ITEMS } from "./constants";
+import { TABLE_OPS, type Strings } from "./i18n";
 
 interface TableMenuProps {
 	visible: boolean;
 	onClose: () => void;
 	onRunCommand: (expr: string) => void;
+	strings: Strings;
 }
 
 // Structural table-operations menu (add/delete row/column, merge/split cell,
 // header toggles), opened by the toolbar's table button while the cursor is
 // inside a table.
-export const TableMenu = ({ visible, onClose, onRunCommand }: TableMenuProps) => (
+export const TableMenu = ({ visible, onClose, onRunCommand, strings }: TableMenuProps) => (
 	<Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
 		<TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={onClose}>
 			<View style={styles.menuCard} onStartShouldSetResponder={() => true}>
 				<ScrollView style={styles.scroll}>
-					{STRUCTURAL_ITEMS.map((item) => (
+					{TABLE_OPS.map((op) => (
 						<TouchableOpacity
-							key={item.label}
+							key={op}
 							style={styles.menuItem}
 							onPress={() => {
 								onClose();
-								onRunCommand(item.expr);
+								onRunCommand(`${op}()`);
 							}}
 						>
-							<Text style={styles.menuItemText}>{item.label}</Text>
+							<Text style={styles.menuItemText}>{strings.tableOps[op]}</Text>
 						</TouchableOpacity>
 					))}
 				</ScrollView>

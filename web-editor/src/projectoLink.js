@@ -121,7 +121,10 @@ function paintCard(dom, attrs) {
 
   const title = document.createElement('div');
   title.className = 'pl-card-title';
-  title.textContent = attrs.title || 'Загрузка…';
+  // Set from the native side by RichEditor's `locale` prop (injectJS); the
+  // literal is only the fallback for a card built before that lands.
+  title.textContent =
+    attrs.title || (window.__espeStrings && window.__espeStrings.projectoLinkLoading) || 'Загрузка…';
   body.appendChild(title);
 
   if (attrs.description) {

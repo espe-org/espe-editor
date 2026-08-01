@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { Modal, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import type { Strings } from "./i18n";
 
 interface TableSizeModalProps {
 	visible: boolean;
 	onClose: () => void;
 	onConfirm: (rows: number, columns: number) => void;
+	strings: Strings;
 }
 
 const MIN = 1;
@@ -47,7 +49,12 @@ const Stepper = ({
 // Table-size picker, opened by the toolbar's table button when the cursor is
 // outside a table (inside one, the structural-ops menu — TableMenu — opens
 // instead).
-export const TableSizeModal = ({ visible, onClose, onConfirm }: TableSizeModalProps) => {
+export const TableSizeModal = ({
+	visible,
+	onClose,
+	onConfirm,
+	strings,
+}: TableSizeModalProps) => {
 	const [rows, setRows] = useState(DEFAULT_SIZE);
 	const [columns, setColumns] = useState(DEFAULT_SIZE);
 
@@ -55,14 +62,14 @@ export const TableSizeModal = ({ visible, onClose, onConfirm }: TableSizeModalPr
 		<Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
 			<TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={onClose}>
 				<View style={styles.card} onStartShouldSetResponder={() => true}>
-					<Text style={styles.title}>Новая таблица</Text>
+					<Text style={styles.title}>{strings.tableTitle}</Text>
 
-					<Stepper label="Строк" value={rows} onChange={setRows} />
-					<Stepper label="Столбцов" value={columns} onChange={setColumns} />
+					<Stepper label={strings.tableRows} value={rows} onChange={setRows} />
+					<Stepper label={strings.tableColumns} value={columns} onChange={setColumns} />
 
 					<View style={styles.actions}>
 						<TouchableOpacity style={styles.actionButton} onPress={onClose}>
-							<Text style={styles.cancelText}>Отмена</Text>
+							<Text style={styles.cancelText}>{strings.cancel}</Text>
 						</TouchableOpacity>
 						<TouchableOpacity
 							style={styles.actionButton}
@@ -72,7 +79,7 @@ export const TableSizeModal = ({ visible, onClose, onConfirm }: TableSizeModalPr
 								setColumns(DEFAULT_SIZE);
 							}}
 						>
-							<Text style={styles.confirmText}>Добавить</Text>
+							<Text style={styles.confirmText}>{strings.tableConfirm}</Text>
 						</TouchableOpacity>
 					</View>
 				</View>

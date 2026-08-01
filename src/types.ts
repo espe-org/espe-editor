@@ -1,4 +1,5 @@
 import type { StyleProp, ViewStyle } from "react-native";
+import type { LocaleOption } from "./i18n";
 
 export interface RichEditorProps {
 	/** Uncontrolled initial WebView doc content (HTML). Only read on mount. */
@@ -94,6 +95,16 @@ export interface RichEditorProps {
 	 * to "light". This does not affect anything outside the WebView — pair
 	 * it with your app's own dark-mode state. */
 	colorScheme?: "light" | "dark";
+
+	/** Language of the strings this library renders itself: the table menus,
+	 * the image-source sheet, and the Projecto card's loading placeholder.
+	 * Defaults to `"ru"` — today's behavior — so this is opt-in. `"auto"`
+	 * follows the device language via `Intl`, treating anything non-Russian
+	 * as English (and falling back to `"ru"` if `Intl` is unavailable).
+	 *
+	 * This only covers the library's own chrome. Content, `placeholder`, and
+	 * anything your app renders around the editor stay yours. */
+	locale?: LocaleOption;
 
 	style?: StyleProp<ViewStyle>;
 }
