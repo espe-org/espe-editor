@@ -19,7 +19,8 @@ export interface RichEditorProps {
 
 	placeholder?: string;
 	autofocus?: boolean;
-	editable?: boolean;
+  editable?: boolean;
+	hideKeyboardCloseButton?: boolean;
 
 	/** Called when the toolbar's image button is pressed. The app owns the
 	 * picker UI (camera/gallery/permissions) entirely; return a data-URI or
