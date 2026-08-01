@@ -18,6 +18,7 @@ import { ColorBar } from "./ColorBar";
 import { HIGHLIGHT_COLORS, IMAGE_CSS, TEXT_COLORS } from "./constants";
 import { editorHtml } from "./generated/editorHtml";
 import { ImagePreviewModal } from "./ImagePreviewModal";
+import { askImageSource } from "./imageSourceSheet";
 import { buildPatchProjectoLinkScript, resolveProjectoLink } from "./projectoLinkResolver";
 import { TableMenu } from "./TableMenu";
 import { TableSizeModal } from "./TableSizeModal";
@@ -36,6 +37,7 @@ export const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
 			autofocus = true,
 			editable = true,
 			onRequestImage,
+			onRequestCamera,
 			onImagePress,
 			onProjectoLinkPress,
 			textColors = TEXT_COLORS,
@@ -150,11 +152,30 @@ export const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
 			if (uri) editor.setImage(uri);
 		};
 
+		const handleRequestCamera = async () => {
+			if (!onRequestCamera) return;
+			const uri = await onRequestCamera();
+			if (uri) editor.setImage(uri);
+		};
+
+		// With both sources wired up the toolbar button first asks which one to
+		// use via the platform's system chooser; with only one it goes straight
+		// there, since a one-item sheet reads badly (same reasoning as the
+		// table button's insert-vs-menu split).
+		const handleImageButtonPress = async () => {
+			if (!onRequestImage) return handleRequestCamera();
+			if (!onRequestCamera) return handleRequestImage();
+
+			const source = await askImageSource(colorScheme);
+			if (source === "gallery") await handleRequestImage();
+			else if (source === "camera") await handleRequestCamera();
+		};
+
 		const toolbarItems = useToolbarItems({
 			editor,
 			runCommand,
-			hasImagePicker: !!onRequestImage,
-			onImagePress: handleRequestImage,
+			hasImagePicker: !!onRequestImage || !!onRequestCamera,
+			onImagePress: handleImageButtonPress,
 			onTextColorPress: () => setColorMenu("text"),
 			onHighlightPress: () => setColorMenu("highlight"),
 			onOpenTableMenu: () => setTableMenuVisible(true),

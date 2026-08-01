@@ -38,6 +38,15 @@ export const STRUCTURAL_ITEMS: StructuralItem[] = [
 	{ label: "Разделить ячейку", expr: "splitCell()" },
 ];
 
+// Labels for the image-source sheet shown by the toolbar's image button when
+// the host app supplies both onRequestImage and onRequestCamera.
+export const IMAGE_SOURCE_LABELS = {
+	title: "Добавить фото",
+	gallery: "Выбрать из галереи",
+	camera: "Снять фото",
+	cancel: "Отмена",
+};
+
 // Injected into the WebView so inserted images render at a sane size.
 export const IMAGE_CSS = `
   img {

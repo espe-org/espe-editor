@@ -62,7 +62,8 @@ function actionNameOf(item: ToolbarItem): ToolbarAction | undefined {
 //    bundle's chain commands, so they work on any block, not just list items;
 //  - text-color / highlight buttons open a swatch picker (see ColorBar);
 //  - an image button (only when `hasImagePicker` is true — i.e. the host app
-//    supplied onRequestImage) opens the host's own picker;
+//    supplied onRequestImage and/or onRequestCamera) opens the host's own
+//    picker, via a system source chooser when both were supplied;
 //  - a table button is appended: outside a table it inserts one directly (a
 //    one-item menu reads badly), inside a table it opens the structural-ops
 //    menu.

@@ -22,11 +22,20 @@ export interface RichEditorProps {
   editable?: boolean;
 	hideKeyboardCloseButton?: boolean;
 
-	/** Called when the toolbar's image button is pressed. The app owns the
-	 * picker UI (camera/gallery/permissions) entirely; return a data-URI or
-	 * remote URL to insert, or null/undefined to cancel. The image toolbar
-	 * button is only rendered when this prop is supplied. */
+	/** Called when the user picks "gallery" from the toolbar's image button.
+	 * The app owns the picker UI (gallery/permissions) entirely; return a
+	 * data-URI or remote URL to insert, or null/undefined to cancel. */
 	onRequestImage?: () => Promise<string | null | undefined>;
+
+	/** Called when the user picks "camera" from the toolbar's image button.
+	 * Same contract as `onRequestImage` — the app owns the capture UI and
+	 * permissions, and returns a data-URI or remote URL to insert.
+	 *
+	 * The image toolbar button renders when either this or `onRequestImage`
+	 * is supplied. With both, pressing it first shows the platform's system
+	 * chooser (an action sheet on iOS, an alert dialog on Android); with only
+	 * one, that one is invoked directly with no intermediate sheet. */
+	onRequestCamera?: () => Promise<string | null | undefined>;
 
 	/** Override the built-in full-screen image-preview modal (triggered by
 	 * long-press inside the WebView). If omitted, RichEditor's own preview
@@ -68,7 +77,7 @@ export interface RichEditorProps {
 	/** Restricts the toolbar to only these actions, in this order isn't
 	 * guaranteed (built-ins render in their standard order). Omit to show
 	 * the full default set (today's behavior). `"image"` still additionally
-	 * requires `onRequestImage` to be supplied. */
+	 * requires `onRequestImage` or `onRequestCamera` to be supplied. */
 	toolbarActions?: ToolbarAction[];
 
 	/** Fired when the editor gains/loses focus — e.g. to track which of

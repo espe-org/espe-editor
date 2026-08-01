@@ -39,7 +39,11 @@ function Screen() {
       initialContent="<h2>Hello!</h2>"
       onChangeHTML={(html) => console.log(html)}
       onRequestImage={async () => {
-        // Show your own image picker / camera UI here, return a data-URI or URL.
+        // Show your own gallery picker here, return a data-URI or URL.
+        return null;
+      }}
+      onRequestCamera={async () => {
+        // Show your own camera UI here, return a data-URI or URL.
         return null;
       }}
     />
@@ -76,9 +80,16 @@ function Screen() {
         editable={true} // default
 
         // --- Images ---
-        // Toolbar's image button only renders when onRequestImage is supplied.
+        // Toolbar's image button renders when onRequestImage and/or
+        // onRequestCamera is supplied. With both, pressing it first shows the
+        // platform's system chooser ("Выбрать из галереи" / "Снять фото");
+        // with only one, that one opens directly.
         onRequestImage={async () => {
-          // Show your own picker/camera UI, return a data-URI or URL (or null to cancel).
+          // Show your own gallery picker, return a data-URI or URL (or null to cancel).
+          return null;
+        }}
+        onRequestCamera={async () => {
+          // Show your own camera UI, return a data-URI or URL (or null to cancel).
           return null;
         }}
         onImagePress={(src) => console.log("image tapped:", src)} // optional; overrides the built-in preview modal
@@ -124,8 +135,10 @@ function Screen() {
 This library owns the core editing surface only: the toolbar, tables, text
 color/highlight, drag-to-reorder blocks, and the WebView bundle. Image picking
 (camera/gallery permissions) and document I/O (save/load/share/clipboard) are
-deliberately left to the consuming app — wire them up via `onRequestImage` and
-the imperative ref (`getHTML()` / `setContent()`).
+deliberately left to the consuming app — wire them up via `onRequestImage` /
+`onRequestCamera` and the imperative ref (`getHTML()` / `setContent()`). The
+only picking UI the library owns is the system sheet asking *which* of those
+two sources to use.
 
 ## API
 
@@ -139,7 +152,8 @@ the imperative ref (`getHTML()` / `setContent()`).
 | `placeholder`      | `string`                                          | |
 | `autofocus`        | `boolean`                                         | Defaults to `true`. |
 | `editable`         | `boolean`                                         | Defaults to `true`. |
-| `onRequestImage`   | `() => Promise<string \| null \| undefined>`      | Called when the toolbar's image button is pressed. The image button is hidden entirely if this prop is omitted. |
+| `onRequestImage`   | `() => Promise<string \| null \| undefined>`      | Gallery source for the toolbar's image button. |
+| `onRequestCamera`  | `() => Promise<string \| null \| undefined>`      | Camera source for the toolbar's image button. The button is hidden entirely unless at least one of the two is supplied; with both, pressing it shows the system source chooser (`ActionSheetIOS` on iOS, `Alert` on Android) first. |
 | `onImagePress`     | `(src: string) => void`                           | Overrides the built-in full-screen image-preview modal (triggered by long-pressing an image). |
 | `onProjectoLinkPress` | `(taskUrl: string) => void`                   | Tap handler for resolved Projecto task-share cards (detection is always on). Defaults to `Linking.openURL`. |
 | `onLinkPress`      | `(href: string) => void`                          | Tap handler for any other hyperlink in the content. Defaults to `Linking.openURL`. |
@@ -148,7 +162,7 @@ the imperative ref (`getHTML()` / `setContent()`).
 | `dynamicHeight`    | `boolean`                                         | Size the WebView to its own content instead of `flex: 1`, for embedding inline in a scrollable screen. Pair with `toolbarPosition: "top"/"bottom"`, not `"floating"`. |
 | `onContentHeightChange` | `(height: number) => void`                   | Fires on document height changes. Only meaningful with `dynamicHeight`. |
 | `toolbarPosition`  | `"floating" \| "top" \| "bottom"`                 | Defaults to `"floating"` (absolute, keyboard-tracked, auto-hides while unfocused). `"top"`/`"bottom"` dock it in normal flow, always visible. |
-| `toolbarActions`   | `ToolbarAction[]`                                 | Restricts the toolbar to these actions. Omit for the full default set. `"image"` still additionally requires `onRequestImage`. |
+| `toolbarActions`   | `ToolbarAction[]`                                 | Restricts the toolbar to these actions. Omit for the full default set. `"image"` still additionally requires `onRequestImage` or `onRequestCamera`. |
 | `onFocus`          | `() => void`                                      | |
 | `onBlur`           | `() => void`                                      | |
 | `colorScheme`      | `"light" \| "dark"`                               | Defaults to `"light"`. Switches the editor's own built-in theme/CSS; pair with your app's dark-mode state. |
