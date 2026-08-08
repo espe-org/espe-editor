@@ -130,6 +130,9 @@ export type ToolbarAction =
 
 export interface RichEditorRef {
 	getHTML: () => Promise<string>;
+	/** Replaces the document. Safe to call before the editor has finished
+	 * booting: content handed over early is held and applied as soon as the
+	 * WebView is up, so a host can mount RichEditor ahead of its own data. */
 	setContent: (html: string) => void;
 	focus: (pos?: "start" | "end" | "all" | number) => void;
 	blur: () => void;
