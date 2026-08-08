@@ -111,6 +111,24 @@ export const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
 		const lastEmittedRef = useRef<string | null>(null);
 		const changeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+		// Content that arrived before the WebView was able to receive it.
+		//
+		// tentap's bridge does not buffer: sendAction() logs "Editor isn't ready
+		// yet" and returns when webviewRef is empty, and even once the ref is
+		// set, postMessage() into a document that hasn't finished loading is
+		// dropped. So a setContent() issued while the editor is still booting is
+		// lost silently. That is easy to hit — the WebView carries the whole
+		// editor bundle, so hosts that mount RichEditor early (to overlap its
+		// boot with their own data loading) will usually have their content
+		// ready first.
+		//
+		// Readiness is tracked from tentap's own editor-ready message rather
+		// than from editor state: `isReady` only reaches the state via a
+		// StateUpdate, which the WebView emits on editor activity alone, and a
+		// note the user merely opens may never produce any.
+		const isReadyRef = useRef(false);
+		const pendingContentRef = useRef<string | null>(null);
+
 		const editor = useEditorBridge({
 			customSource: editorHtml,
 			autofocus,
@@ -136,13 +154,35 @@ export const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
 			};
 		}, []);
 
+		// Same contract as editor.setContent(), minus the silent loss: content
+		// handed over too early is held and applied as soon as the editor is up.
+		const setContentWhenReady = (html: string) => {
+			if (!isReadyRef.current) {
+				pendingContentRef.current = html;
+				return;
+			}
+			editor.setContent(html);
+		};
+
+		// Called when the WebView reports the editor is up (see onMessage).
+		// Nothing the user typed can be overwritten here: the editor could not
+		// accept input before it was ready.
+		const flushPendingContent = () => {
+			isReadyRef.current = true;
+			if (pendingContentRef.current === null) return;
+			const html = pendingContentRef.current;
+			pendingContentRef.current = null;
+			editor.setContent(html);
+		};
+
 		// Lightly-controlled mode: only push `value` down when it didn't
 		// originate from this component's own onChangeHTML emission.
 		useEffect(() => {
 			if (value === undefined) return;
 			if (value === lastEmittedRef.current) return;
-			editor.setContent(value);
+			setContentWhenReady(value);
 			lastEmittedRef.current = value;
+			// eslint-disable-next-line react-hooks/exhaustive-deps
 		}, [value, editor]);
 
 		const runCommand = (expr: string) => {
@@ -193,7 +233,7 @@ export const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
 			ref,
 			() => ({
 				getHTML: () => editor.getHTML(),
-				setContent: (html: string) => editor.setContent(html),
+				setContent: (html: string) => setContentWhenReady(html),
 				focus: (pos) => editor.focus(pos),
 				blur: () => editor.blur(),
 				runCommand,
@@ -308,6 +348,17 @@ export const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
 							const data = event?.nativeEvent?.data;
 							if (typeof data !== "string") return;
 							try {
+								// Posted by tentap from the WebView editor's onCreate.
+								// This is the moment the bridge starts carrying messages,
+								// so anything setContent() had to hold back goes in now.
+								// tentap drives its own autofocus off the same message,
+								// so this round-trip is no less reliable here than it is
+								// for the library's own behaviour.
+								if (data.indexOf("editor-ready") !== -1) {
+									flushPendingContent();
+									return;
+								}
+
 								// Posted by web-editor/src/imageLongPress.js on a
 								// long-press of an image.
 								if (data.indexOf("imagePreview") !== -1) {
