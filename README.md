@@ -121,6 +121,7 @@ function Screen() {
 
         // --- Theming ---
         colorScheme="dark" // "light" (default) | "dark" — pair with your app's own dark-mode state
+        firstLineStyle={{ fontSize: 24, fontWeight: 900 }} // omit for uniform text
 
         // --- Language ---
         locale="auto" // "ru" (default) | "en" | "auto" — covers the library's own menus only
@@ -193,6 +194,7 @@ pushed in via `injectJS` and needs no bundle rebuild to change.
 | `onFocus`          | `() => void`                                      | |
 | `onBlur`           | `() => void`                                      | |
 | `colorScheme`      | `"light" \| "dark"`                               | Defaults to `"light"`. Switches the editor's own built-in theme/CSS; pair with your app's dark-mode state. |
+| `firstLineStyle`   | `{ fontSize?: number; fontWeight?: number \| string }` | Gives the document's first block a look of its own — a title line. Presentation only: nothing is written into the content, and `onChangeHTML` is unaffected. Omit for uniform text. |
 | `locale`           | `"ru" \| "en" \| "auto"`                          | Language of the library's own menus. Defaults to `"ru"` (today's behavior). See [Localization](#localization). |
 | `style`            | `StyleProp<ViewStyle>`                            | Wraps the editor + toolbar container. |
 

@@ -96,6 +96,20 @@ export interface RichEditorProps {
 	 * it with your app's own dark-mode state. */
 	colorScheme?: "light" | "dark";
 
+	/** Gives the document's first block a look of its own — the large bold
+	 * title line a note gets when its opening line doubles as a heading.
+	 * Omit for uniform text (today's behavior).
+	 *
+	 * This is presentation only: nothing is written into the content, so the
+	 * styling follows whatever block happens to be first as the user edits,
+	 * and the HTML you get back from `onChangeHTML` is unaffected. It applies
+	 * to any first block, not just a paragraph, so a heading or a list at the
+	 * top is styled too. */
+	firstLineStyle?: {
+		fontSize?: number;
+		fontWeight?: number | string;
+	};
+
 	/** Language of the strings this library renders itself: the table menus,
 	 * the image-source sheet, and the Projecto card's loading placeholder.
 	 * Defaults to `"ru"` — today's behavior — so this is opt-in. `"auto"`

@@ -52,6 +52,7 @@ export const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
 			onBlur,
 			onLinkPress,
 			colorScheme = "light",
+			firstLineStyle,
 			locale = "ru",
 			style,
 			hideKeyboardCloseButton = false,
@@ -153,6 +154,18 @@ export const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
 				if (changeTimerRef.current) clearTimeout(changeTimerRef.current);
 			};
 		}, []);
+
+		// tentap themes the WebView itself; these are the React Native boxes
+		// around it, and they have to follow the same scheme. Otherwise the
+		// light default stays put in dark mode and shows through everywhere the
+		// WebView doesn't reach — most visibly as a pale strip down the left,
+		// where editorWrapper's 2px inset sits. Taken from tentap's own theme
+		// rather than hardcoded, so the two cannot drift apart.
+		const surfaceColor =
+			colorScheme === "dark"
+				? ((darkEditorTheme.webview as { backgroundColor?: string } | undefined)
+						?.backgroundColor ?? "#1C1C1E")
+				: "#fff";
 
 		// Same contract as editor.setContent(), minus the silent loss: content
 		// handed over too early is held and applied as soon as the editor is up.
@@ -274,6 +287,33 @@ export const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
 			// eslint-disable-next-line react-hooks/exhaustive-deps
 		}, [editor, colorScheme]);
 
+		// Built from the primitives rather than the object so that a caller
+		// passing an inline literal doesn't re-inject the stylesheet on every
+		// render.
+		const firstLineCss = useMemo(() => {
+			const rules = [
+				firstLineStyle?.fontSize !== undefined
+					? `font-size: ${firstLineStyle.fontSize}px;`
+					: null,
+				firstLineStyle?.fontWeight !== undefined
+					? `font-weight: ${firstLineStyle.fontWeight};`
+					: null,
+			].filter(Boolean);
+
+			if (!rules.length) return "";
+
+			// `:first-child` counts as a class for specificity, so this outranks
+			// the bundle's own `.ProseMirror p` block rules without !important.
+			// Direct-child only: nested first items (a list's first <li>, a
+			// table's first cell) are not the document's opening block.
+			return `.ProseMirror > :first-child { ${rules.join(" ")} }`;
+		}, [firstLineStyle?.fontSize, firstLineStyle?.fontWeight]);
+
+		useEffect(() => {
+			editor.injectCSS(firstLineCss, "first-line");
+			// eslint-disable-next-line react-hooks/exhaustive-deps
+		}, [editor, firstLineCss]);
+
 		// Uses the bridge's own low-level state subscription rather than
 		// useBridgeState, which would re-render RichEditor on every keystroke/
 		// selection change just to watch one boolean.
@@ -321,6 +361,7 @@ export const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
 				ref={containerRef}
 				style={[
 					dynamicHeight ? styles.containerAuto : styles.container,
+					{ backgroundColor: surfaceColor },
 					!dynamicHeight && toolbarPosition !== "floating"
 						? { paddingBottom: keyboardOverlap }
 						: null,
@@ -332,6 +373,7 @@ export const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
 				<View
 					style={[
 						dynamicHeight ? styles.editorWrapperAuto : styles.editorWrapper,
+						{ backgroundColor: surfaceColor },
 						dynamicHeight ? { height: contentHeight } : null,
 					]}
 				>
@@ -469,19 +511,17 @@ RichEditor.displayName = "RichEditor";
 
 export default RichEditor;
 
+// The background of these four is applied at the usage site from
+// surfaceColor, since it depends on colorScheme.
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		backgroundColor: "#fff",
 	},
 	// Used when dynamicHeight is true: the box sizes to its content (the
 	// WebView applies its own height internally), not stretched by flex.
-	containerAuto: {
-		backgroundColor: "#fff",
-	},
+	containerAuto: {},
 	editorWrapper: {
 		flex: 1,
-		backgroundColor: "#fff",
 		// No right inset: the WebView spans to the screen edge so its
 		// scrollbar sits at the edge (not floating over the drag-handle
 		// gutter). The text inset lives inside the bundle (.ProseMirror
@@ -490,7 +530,6 @@ const styles = StyleSheet.create({
 		paddingRight: 0,
 	},
 	editorWrapperAuto: {
-		backgroundColor: "#fff",
 		paddingLeft: 2,
 		paddingRight: 0,
 	},
