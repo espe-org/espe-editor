@@ -75,3 +75,4 @@ android/keystores/debug.keystore
 # Turborepo
 .turbo/
 
+/.omc
