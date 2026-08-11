@@ -112,7 +112,8 @@ export const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
 		const lastEmittedRef = useRef<string | null>(null);
 		const changeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-		// Content that arrived before the WebView was able to receive it.
+		// Content and placeholder that arrived before the WebView was able to
+		// receive them.
 		//
 		// tentap's bridge does not buffer: sendAction() logs "Editor isn't ready
 		// yet" and returns when webviewRef is empty, and even once the ref is
@@ -123,12 +124,19 @@ export const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
 		// boot with their own data loading) will usually have their content
 		// ready first.
 		//
+		// The placeholder is worse than easy to hit: its effect runs on mount,
+		// which is always before the bundle has booted, and the prop rarely
+		// changes afterwards, so the effect never fires again and the message
+		// is simply never delivered. What stays on screen is then tiptap's own
+		// hardcoded English default, whatever the host passed.
+		//
 		// Readiness is tracked from tentap's own editor-ready message rather
 		// than from editor state: `isReady` only reaches the state via a
 		// StateUpdate, which the WebView emits on editor activity alone, and a
 		// note the user merely opens may never produce any.
 		const isReadyRef = useRef(false);
 		const pendingContentRef = useRef<string | null>(null);
+		const pendingPlaceholderRef = useRef<string | null>(null);
 
 		const editor = useEditorBridge({
 			customSource: editorHtml,
@@ -177,11 +185,29 @@ export const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
 			editor.setContent(html);
 		};
 
+		// Same for the placeholder, which has no other way in: tentap takes no
+		// placeholder option, so this bridge message is the only thing that
+		// ever overrides the tiptap extension's built-in default.
+		const setPlaceholderWhenReady = (text: string) => {
+			if (!isReadyRef.current) {
+				pendingPlaceholderRef.current = text;
+				return;
+			}
+			editor.setPlaceholder(text);
+		};
+
 		// Called when the WebView reports the editor is up (see onMessage).
 		// Nothing the user typed can be overwritten here: the editor could not
 		// accept input before it was ready.
-		const flushPendingContent = () => {
+		const flushPending = () => {
 			isReadyRef.current = true;
+
+			if (pendingPlaceholderRef.current !== null) {
+				const text = pendingPlaceholderRef.current;
+				pendingPlaceholderRef.current = null;
+				editor.setPlaceholder(text);
+			}
+
 			if (pendingContentRef.current === null) return;
 			const html = pendingContentRef.current;
 			pendingContentRef.current = null;
@@ -275,7 +301,7 @@ export const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
 		}, [editor, strings]);
 
 		useEffect(() => {
-			if (placeholder !== undefined) editor.setPlaceholder(placeholder);
+			if (placeholder !== undefined) setPlaceholderWhenReady(placeholder);
 			// eslint-disable-next-line react-hooks/exhaustive-deps
 		}, [editor, placeholder]);
 
@@ -392,12 +418,12 @@ export const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
 							try {
 								// Posted by tentap from the WebView editor's onCreate.
 								// This is the moment the bridge starts carrying messages,
-								// so anything setContent() had to hold back goes in now.
-								// tentap drives its own autofocus off the same message,
-								// so this round-trip is no less reliable here than it is
-								// for the library's own behaviour.
+								// so anything setContent()/setPlaceholder() had to hold
+								// back goes in now. tentap drives its own autofocus off
+								// the same message, so this round-trip is no less reliable
+								// here than it is for the library's own behaviour.
 								if (data.indexOf("editor-ready") !== -1) {
-									flushPendingContent();
+									flushPending();
 									return;
 								}
 
