@@ -1,5 +1,6 @@
 import {
 	RichText,
+	TenTapStartKit,
 	Toolbar as TenTapToolbar,
 	darkEditorCss,
 	darkEditorTheme,
@@ -124,11 +125,8 @@ export const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
 		// boot with their own data loading) will usually have their content
 		// ready first.
 		//
-		// The placeholder is worse than easy to hit: its effect runs on mount,
-		// which is always before the bundle has booted, and the prop rarely
-		// changes afterwards, so the effect never fires again and the message
-		// is simply never delivered. What stays on screen is then tiptap's own
-		// hardcoded English default, whatever the host passed.
+		// The placeholder no longer goes through here at all — see
+		// bridgeExtensions below, it is configured before the WebView loads.
 		//
 		// Readiness is tracked from tentap's own editor-ready message rather
 		// than from editor state: `isReady` only reaches the state via a
@@ -138,7 +136,30 @@ export const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
 		const pendingContentRef = useRef<string | null>(null);
 		const pendingPlaceholderRef = useRef<string | null>(null);
 
+		// The placeholder goes in as the extension's own option, baked into the
+		// bridge config map that is injected before the WebView loads, so the
+		// right text is on screen from the first frame.
+		//
+		// The alternative — the runtime `set-placeholder` bridge message — does
+		// not work at all under tiptap v3. That handler assigns to
+		// `extensionManager.extensions[i].options.placeholder`, and in v3 an
+		// extension's `options` is derived, not a writable bag: the assignment
+		// is silently dropped (verified on device — the message arrives, the
+		// option reads back unchanged), leaving tiptap's English default.
+		const bridgeExtensions = useMemo(
+			() =>
+				placeholder === undefined
+					? TenTapStartKit
+					: TenTapStartKit.map((bridge) =>
+							bridge.name === "placeholder"
+								? bridge.configureExtension({ placeholder })
+								: bridge,
+						),
+			[placeholder],
+		);
+
 		const editor = useEditorBridge({
+			bridgeExtensions,
 			customSource: editorHtml,
 			autofocus,
 			avoidIosKeyboard: true,
@@ -185,9 +206,12 @@ export const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
 			editor.setContent(html);
 		};
 
-		// Same for the placeholder, which has no other way in: tentap takes no
-		// placeholder option, so this bridge message is the only thing that
-		// ever overrides the tiptap extension's built-in default.
+		// Best effort for a `placeholder` prop that changes after mount: the
+		// config map is injected once, before the WebView loads, so a later
+		// value can only travel as a bridge message. That message is a no-op
+		// under tiptap v3 (see bridgeExtensions above); it is kept because it
+		// is the only channel that exists for this case, and it costs nothing
+		// if tentap makes the handler v3-aware.
 		const setPlaceholderWhenReady = (text: string) => {
 			if (!isReadyRef.current) {
 				pendingPlaceholderRef.current = text;
