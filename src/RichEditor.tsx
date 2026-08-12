@@ -162,7 +162,25 @@ export const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
 			bridgeExtensions,
 			customSource: editorHtml,
 			autofocus,
-			avoidIosKeyboard: true,
+			// Exactly the cases this component does NOT handle itself — the
+			// inverse of the keyboardOverlap padding below.
+			//
+			// tentap's avoidance assumes the WebView keeps its full height *behind*
+			// the keyboard: on iOS it gives the document a paddingBottom of the
+			// keyboard height and sets the same value as the scroll margin, so the
+			// caret is never left under the keys. With a docked toolbar this
+			// component does the opposite — the box itself shrinks above the
+			// keyboard — and the two compose into nonsense: a scroll margin worth a
+			// whole keyboard, applied to a viewport barely taller than one, pushes
+			// the caret line to the top edge and leaves the rest of the editor
+			// blank on every keystroke.
+			//
+			// Left on for a floating toolbar, where the box does stay full height
+			// and tentap's inset is the only thing keeping the caret visible. Off
+			// in embeddable mode: there the document height drives the box height,
+			// so a keyboard-sized padding would inflate the layout, and the
+			// consuming screen owns scrolling anyway.
+			avoidIosKeyboard: !dynamicHeight && toolbarPosition === "floating",
 			editable,
 			initialContent,
 			dynamicHeight,
