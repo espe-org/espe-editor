@@ -90,22 +90,75 @@ export const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
 		// keyboard. Meaningless in embeddable (dynamicHeight) mode — the box
 		// doesn't fill the screen there, so "overlap with the keyboard" isn't a
 		// coherent idea; the consuming screen owns scrolling/positioning instead.
+		//
+		// Последний кадр клавиатуры. Живёт в ref, а не в замыкании эффекта,
+		// потому что пересчитывать перекрытие приходится и вне событий
+		// клавиатуры — см. recomputeKeyboardOverlap.
+		const keyboardFrameRef = useRef<{ screenY: number; height: number } | null>(
+			null,
+		);
+
+		// Меряет контейнер и переводит кадр клавиатуры в перекрытие.
+		//
+		// Вызывается и по событию клавиатуры, и по onLayout контейнера. Одного
+		// события мало: хост, который сам уводит контент от клавиатуры (скажем,
+		// оборачивает нас в KeyboardAvoidingView), накладывает свой паддинг не
+		// мгновенно. При возврате приложения из фона measureInWindow успевает
+		// отработать раньше — контейнер ещё во всю высоту, и мы вычитаем
+		// клавиатуру вторым слоем поверх хостового. Замерено на iPhone Air:
+		// в покое height=439, overlap=0; сразу после возврата height=786,
+		// overlap=275. Эти 275pt пустоты над клавиатурой держались до следующего
+		// события клавиатуры, то есть до первого действия пользователя.
+		//
+		// Зацикливания нет: собственный paddingBottom не меняет внешний фрейм,
+		// который читает measureInWindow, поэтому сам себя onLayout не вызывает.
+		const recomputeKeyboardOverlap = () => {
+			const frame = keyboardFrameRef.current;
+
+			if (!frame) {
+				setKeyboardOverlap(0);
+				return;
+			}
+
+			containerRef.current?.measureInWindow((_x, y, _width, height) => {
+				const containerBottomY = y + height;
+				// Перекрытие не бывает больше самой клавиатуры: всё сверх её
+				// высоты — либо чужой паддинг, уже наложенный хостом, либо замер,
+				// снятый не вовремя.
+				setKeyboardOverlap(
+					Math.min(Math.max(containerBottomY - frame.screenY, 0), frame.height),
+				);
+			});
+		};
+
 		useEffect(() => {
 			if (dynamicHeight) return undefined;
 			const hideEvent: KeyboardEventName =
 				Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
 			const didShow = Keyboard.addListener("keyboardDidShow", (e) => {
-				containerRef.current?.measureInWindow((_x, y, _width, height) => {
-					const containerBottomY = y + height;
-					const keyboardTopY = e.endCoordinates.screenY;
-					setKeyboardOverlap(Math.max(containerBottomY - keyboardTopY, 0));
-				});
+				// Уходя в фон, iOS присылает keyboardDidShow с пустым кадром:
+				// screenY и height по нулям. Принятый всерьёз, он давал перекрытие
+				// во всю высоту контейнера — весь редактор уходил под паддинг.
+				// Такой кадр не описывает ничего, пропускаем.
+				if (!e.endCoordinates.height || !e.endCoordinates.screenY) {
+					return;
+				}
+
+				keyboardFrameRef.current = {
+					height: e.endCoordinates.height,
+					screenY: e.endCoordinates.screenY,
+				};
+				recomputeKeyboardOverlap();
 			});
-			const hide = Keyboard.addListener(hideEvent, () => setKeyboardOverlap(0));
+			const hide = Keyboard.addListener(hideEvent, () => {
+				keyboardFrameRef.current = null;
+				setKeyboardOverlap(0);
+			});
 			return () => {
 				didShow.remove();
 				hide.remove();
 			};
+			// eslint-disable-next-line react-hooks/exhaustive-deps
 		}, [dynamicHeight]);
 
 		// Guards the `value` effect below against feedback loops: setContent()
@@ -427,6 +480,11 @@ export const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
 		return (
 			<View
 				ref={containerRef}
+				// Пересчитываем перекрытие на каждой переразметке контейнера, а не
+				// только по событию клавиатуры: паддинг хоста приезжает позже
+				// события, и снятый до него замер оставлял лишнюю пустоту над
+				// клавиатурой до первого действия пользователя.
+				onLayout={dynamicHeight ? undefined : recomputeKeyboardOverlap}
 				style={[
 					dynamicHeight ? styles.containerAuto : styles.container,
 					{ backgroundColor: surfaceColor },
