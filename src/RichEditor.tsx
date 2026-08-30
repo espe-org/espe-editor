@@ -267,6 +267,59 @@ export const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
 						?.backgroundColor ?? "#1C1C1E")
 				: "#fff";
 
+		// Доводит вид до каретки, ничего больше не трогая.
+		//
+		// Отдельно от runCommand: тот открывает цепочку с .focus(), то есть
+		// поднимает клавиатуру. Здесь нужен только скролл — вызывающая сторона
+		// сама решает, фокусироваться ли.
+		//
+		// Двойной requestAnimationFrame, а не голый вызов: скролл почти всегда
+		// идёт следом за тем, что саму каретку и двигает — setContent или
+		// focus. Те приходят отдельными сообщениями моста, и на момент
+		// доставки этого документ ещё не перерисован: проверено на устройстве,
+		// прямой вызов после setContent не сдвигал вид вообще. Первый кадр
+		// пропускает применение изменений, второй — раскладку после них.
+		const scrollToCursor = () => {
+			editor.injectJS(
+				`window.__editor && requestAnimationFrame(() =>
+					requestAnimationFrame(() =>
+						window.__editor.commands.scrollIntoView(),
+					),
+				); true;`,
+			);
+		};
+
+		// Переносит автофокус на текст, который пришёл уже после старта.
+		//
+		// tentap применяет autofocus при создании редактора, а документ в этот
+		// момент пуст: у хоста, который монтирует редактор заранее и подаёт
+		// текст позже (ровно то, ради чего и сделан pendingContent), каретка
+		// остаётся в конце пустого документа, а после подстановки оказывается
+		// неизвестно где. На длинной заметке это выглядело так: клавиатура
+		// поднята, каретка в конце текста, а видимая область где-то в
+		// середине — и первый же ввод шёл за пределами экрана.
+		//
+		// Только на первую порцию текста: последующие setContent — это уже не
+		// открытие, и уводить у пользователя каретку там нельзя.
+		const autofocusAppliedRef = useRef(false);
+
+		// Одной инъекцией, а не editor.focus("end") + scrollToCursor: те идут
+		// отдельными сообщениями моста и доставляются раньше, чем ProseMirror
+		// применит новый документ, поэтому "end" разрешался по старому —
+		// пустому — тексту. Проверено на устройстве: вид не сдвигался вовсе.
+		// Внутри WebView оба шага выполняются уже после применения и раскладки.
+		const applyAutofocusToContent = () => {
+			if (!autofocus || autofocusAppliedRef.current) return;
+			autofocusAppliedRef.current = true;
+			editor.injectJS(
+				`window.__editor && requestAnimationFrame(() =>
+					requestAnimationFrame(() =>
+						window.__editor.chain().focus('end').scrollIntoView().run(),
+					),
+				); true;`,
+			);
+		};
+
 		// Same contract as editor.setContent(), minus the silent loss: content
 		// handed over too early is held and applied as soon as the editor is up.
 		const setContentWhenReady = (html: string) => {
@@ -275,6 +328,7 @@ export const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
 				return;
 			}
 			editor.setContent(html);
+			applyAutofocusToContent();
 		};
 
 		// Best effort for a `placeholder` prop that changes after mount: the
@@ -307,6 +361,9 @@ export const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
 			const html = pendingContentRef.current;
 			pendingContentRef.current = null;
 			editor.setContent(html);
+			// Сюда попадает самый частый случай открытия: текст пришёл раньше,
+			// чем редактор поднялся, и ждал во флаге.
+			applyAutofocusToContent();
 		};
 
 		// Lightly-controlled mode: only push `value` down when it didn't
@@ -368,9 +425,17 @@ export const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
 			() => ({
 				getHTML: () => editor.getHTML(),
 				setContent: (html: string) => setContentWhenReady(html),
-				focus: (pos) => editor.focus(pos),
+				// Фокус без скролла оставлял каретку за пределами экрана на
+				// любом тексте длиннее одного экрана — заметнее всего на
+				// focus('end'). Оба сообщения идут одним мостом по порядку,
+				// поэтому скролл приходит уже с новой позицией каретки.
+				focus: (pos) => {
+					editor.focus(pos);
+					scrollToCursor();
+				},
 				blur: () => editor.blur(),
 				runCommand,
+				scrollToCursor,
 			}),
 			// eslint-disable-next-line react-hooks/exhaustive-deps
 			[editor],

@@ -148,10 +148,15 @@ export interface RichEditorRef {
 	 * booting: content handed over early is held and applied as soon as the
 	 * WebView is up, so a host can mount RichEditor ahead of its own data. */
 	setContent: (html: string) => void;
+	/** Focuses the editor and brings the caret into view. */
 	focus: (pos?: "start" | "end" | "all" | number) => void;
 	blur: () => void;
 	/** Escape hatch: run a raw chain expression in the WebView bundle, e.g.
 	 * "indentBlock()" — the same mechanism the table/indent buttons use
 	 * internally. */
 	runCommand: (expr: string) => void;
+	/** Scrolls so the caret is visible, without focusing or raising the
+	 * keyboard. `focus()` and `setContent()` do this already; this is for
+	 * hosts that move the selection by other means. */
+	scrollToCursor: () => void;
 }
