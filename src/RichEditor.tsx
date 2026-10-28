@@ -15,7 +15,7 @@ import {
 	useState,
 } from "react";
 import { Keyboard, Linking, Platform, StyleSheet, View } from "react-native";
-import type { KeyboardEventName } from "react-native";
+import type { KeyboardEvent, KeyboardEventName } from "react-native";
 import { ColorBar } from "./ColorBar";
 import { HIGHLIGHT_COLORS, IMAGE_CSS, TEXT_COLORS } from "./constants";
 import { editorHtml } from "./generated/editorHtml";
@@ -29,6 +29,9 @@ import { useToolbarItems } from "./Toolbar";
 import type { RichEditorProps, RichEditorRef } from "./types";
 
 const ONCHANGE_DEBOUNCE_MS = 300;
+// Сколько после изменения размера WebView держим каретку в виду: с запасом
+// на анимацию клавиатуры (~250ms) и следующую за ней прокрутку WebKit.
+const KEEP_CARET_HOLD_MS = 800;
 
 export const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
 	(
@@ -135,7 +138,7 @@ export const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
 			if (dynamicHeight) return undefined;
 			const hideEvent: KeyboardEventName =
 				Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
-			const didShow = Keyboard.addListener("keyboardDidShow", (e) => {
+			const onFrame = (e: KeyboardEvent) => {
 				// Уходя в фон, iOS присылает keyboardDidShow с пустым кадром:
 				// screenY и height по нулям. Принятый всерьёз, он давал перекрытие
 				// во всю высоту контейнера — весь редактор уходил под паддинг.
@@ -149,13 +152,26 @@ export const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
 					screenY: e.endCoordinates.screenY,
 				};
 				recomputeKeyboardOverlap();
-			});
+			};
+			const didShow = Keyboard.addListener("keyboardDidShow", onFrame);
+			// Уже показанная клавиатура может сменить высоту: панель подсказок,
+			// другая раскладка, диктовка. Без этого перекрытие так и осталось
+			// бы посчитанным по первому кадру. Только пока клавиатура на экране:
+			// при скрытии iOS тоже шлёт смену кадра, а перекрытие там уже
+			// сброшено событием hide.
+			const didChange = Keyboard.addListener(
+				"keyboardDidChangeFrame",
+				(e) => {
+					if (keyboardFrameRef.current) onFrame(e);
+				},
+			);
 			const hide = Keyboard.addListener(hideEvent, () => {
 				keyboardFrameRef.current = null;
 				setKeyboardOverlap(0);
 			});
 			return () => {
 				didShow.remove();
+				didChange.remove();
 				hide.remove();
 			};
 			// eslint-disable-next-line react-hooks/exhaustive-deps
@@ -362,6 +378,18 @@ export const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
 		// высоте ничего бы не сдвинул. resize же срабатывает ровно тогда,
 		// когда новая высота уже применена. Заодно покрывает поворот экрана.
 		//
+		// Одного скролла по resize мало: в Release-сборке на устройстве
+		// каретка всё равно оставалась под клавиатурой, хотя в Debug (и на
+		// устройстве, и в симуляторе) всё было в порядке. Release-JS быстрее:
+		// паддинг доезжает до WebView, пока WebKit ещё не закончил своё
+		// «довести до каретки» под показ клавиатуры, и тот прокручивает уже
+		// после нас — по старой высоте, затирая наш скролл. Поэтому после
+		// каждого resize ещё немного держим каретку: любая прокрутка в это
+		// окно снова доводит вид до неё. scrollIntoView ничего не делает,
+		// если каретка уже видна, так что наш же скролл цикла не заводит, а
+		// прокрутка пользователем вне окна не трогается. visualViewport —
+		// на случай, если WebKit ужимает видимую область, не меняя окно.
+		//
 		// В embeddable-режиме (dynamicHeight) WebView растёт вместе с текстом
 		// и сам не прокручивается — там скроллит экран хоста, слушатель не
 		// нужен. Флаг на window — от повторной установки: editor-ready может
@@ -371,11 +399,32 @@ export const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
 			editor.injectJS(
 				`if (!window.__keepCaretOnResize) {
 					window.__keepCaretOnResize = true;
-					window.addEventListener('resize', () => {
+					let holdUntil = 0;
+					let frame = 0;
+					const reveal = () => {
+						frame = 0;
 						const ed = window.__editor;
 						if (!ed || !ed.view.hasFocus()) return;
-						requestAnimationFrame(() => ed.commands.scrollIntoView());
-					});
+						ed.commands.scrollIntoView();
+					};
+					const schedule = () => {
+						if (!frame) frame = requestAnimationFrame(reveal);
+					};
+					const hold = () => {
+						holdUntil = Date.now() + ${KEEP_CARET_HOLD_MS};
+						schedule();
+					};
+					window.addEventListener('resize', hold);
+					if (window.visualViewport) {
+						window.visualViewport.addEventListener('resize', hold);
+					}
+					window.addEventListener(
+						'scroll',
+						() => {
+							if (Date.now() < holdUntil) schedule();
+						},
+						{ capture: true, passive: true },
+					);
 				} true;`,
 			);
 		};
