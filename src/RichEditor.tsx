@@ -345,11 +345,47 @@ export const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
 			editor.setPlaceholder(text);
 		};
 
+		// Держит каретку в виду, когда WebView меняет размер под фокусом.
+		//
+		// С закреплённым тулбаром клавиатуру обходим мы сами: по
+		// keyboardDidShow контейнер получает paddingBottom и сжимается. iOS к
+		// этому моменту клавиатуру уже показал и своё «довести до поля»
+		// отработал — по старому, полновысотному кадру, где каретка была
+		// видна. Сжатие приходит после, и строка у нижнего края уходит под
+		// клавиатуру. Вылезала она только с первым введённым символом: тогда
+		// ProseMirror сам прокручивает к выделению. Вверху заметки этого не
+		// видно — там каретка остаётся выше нового нижнего края.
+		//
+		// Слушаем resize внутри WebView, а не досылаем scrollToCursor из
+		// keyboardDidShow: событие клавиатуры приходит раньше, чем новый
+		// paddingBottom доезжает до раскладки WebView, и скролл по старой
+		// высоте ничего бы не сдвинул. resize же срабатывает ровно тогда,
+		// когда новая высота уже применена. Заодно покрывает поворот экрана.
+		//
+		// В embeddable-режиме (dynamicHeight) WebView растёт вместе с текстом
+		// и сам не прокручивается — там скроллит экран хоста, слушатель не
+		// нужен. Флаг на window — от повторной установки: editor-ready может
+		// прийти ещё раз в тот же документ.
+		const installKeepCaretOnResize = () => {
+			if (dynamicHeight) return;
+			editor.injectJS(
+				`if (!window.__keepCaretOnResize) {
+					window.__keepCaretOnResize = true;
+					window.addEventListener('resize', () => {
+						const ed = window.__editor;
+						if (!ed || !ed.view.hasFocus()) return;
+						requestAnimationFrame(() => ed.commands.scrollIntoView());
+					});
+				} true;`,
+			);
+		};
+
 		// Called when the WebView reports the editor is up (see onMessage).
 		// Nothing the user typed can be overwritten here: the editor could not
 		// accept input before it was ready.
 		const flushPending = () => {
 			isReadyRef.current = true;
+			installKeepCaretOnResize();
 
 			if (pendingPlaceholderRef.current !== null) {
 				const text = pendingPlaceholderRef.current;
