@@ -205,6 +205,26 @@ export const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
 		const pendingContentRef = useRef<string | null>(null);
 		const pendingPlaceholderRef = useRef<string | null>(null);
 
+		// Стили и скрипты, которые мы вставляем в документ WebView, по тегу.
+		// Эффекты ниже срабатывают при монтировании — раньше, чем WebView
+		// загрузил страницу, и injectJavaScript в незагруженный документ
+		// просто теряется. Повторно они уходили только при перерисовке,
+		// которую давал фокус, поэтому в тёмной теме открытая заметка
+		// оставалась чёрным текстом на чёрном фоне до первого тапа. Храним
+		// последнее значение и досылаем всё в flushPending.
+		const injectedCssRef = useRef<Record<string, string>>({});
+		const injectedJsRef = useRef<Record<string, string>>({});
+
+		const injectCSSPersistent = (css: string, tag: string) => {
+			injectedCssRef.current[tag] = css;
+			editor.injectCSS(css, tag);
+		};
+
+		const injectJSPersistent = (js: string, tag: string) => {
+			injectedJsRef.current[tag] = js;
+			editor.injectJS(js);
+		};
+
 		// The placeholder goes in as the extension's own option, baked into the
 		// bridge config map that is injected before the WebView loads, so the
 		// right text is on screen from the first frame.
@@ -436,6 +456,13 @@ export const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
 			isReadyRef.current = true;
 			installKeepCaretOnResize();
 
+			for (const [tag, css] of Object.entries(injectedCssRef.current)) {
+				editor.injectCSS(css, tag);
+			}
+			for (const js of Object.values(injectedJsRef.current)) {
+				editor.injectJS(js);
+			}
+
 			if (pendingPlaceholderRef.current !== null) {
 				const text = pendingPlaceholderRef.current;
 				pendingPlaceholderRef.current = null;
@@ -527,7 +554,7 @@ export const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
 		);
 
 		useEffect(() => {
-			editor.injectCSS(IMAGE_CSS, "image-styles");
+			injectCSSPersistent(IMAGE_CSS, "image-styles");
 			// eslint-disable-next-line react-hooks/exhaustive-deps
 		}, [editor]);
 
@@ -537,10 +564,11 @@ export const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
 		// web-editor/src/projectoLink.js reads when it builds a card. Cards are
 		// only ever built in response to user input, long after this runs.
 		useEffect(() => {
-			editor.injectJS(
+			injectJSPersistent(
 				`window.__espeStrings = ${JSON.stringify({
 					projectoLinkLoading: strings.projectoLinkLoading,
 				})}; true;`,
+				"strings",
 			);
 			// eslint-disable-next-line react-hooks/exhaustive-deps
 		}, [editor, strings]);
@@ -554,7 +582,7 @@ export const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
 		// is the document/prose color rules. injectCSS replaces by tag, so
 		// switching back to "light" with an empty string clears it.
 		useEffect(() => {
-			editor.injectCSS(colorScheme === "dark" ? darkEditorCss : "", "color-scheme");
+			injectCSSPersistent(colorScheme === "dark" ? darkEditorCss : "", "color-scheme");
 			// eslint-disable-next-line react-hooks/exhaustive-deps
 		}, [editor, colorScheme]);
 
@@ -581,7 +609,7 @@ export const RichEditor = forwardRef<RichEditorRef, RichEditorProps>(
 		}, [firstLineStyle?.fontSize, firstLineStyle?.fontWeight]);
 
 		useEffect(() => {
-			editor.injectCSS(firstLineCss, "first-line");
+			injectCSSPersistent(firstLineCss, "first-line");
 			// eslint-disable-next-line react-hooks/exhaustive-deps
 		}, [editor, firstLineCss]);
 
